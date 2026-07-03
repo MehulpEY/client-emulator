@@ -77,6 +77,8 @@ export const api = {
     j<{ ok: boolean }>(`/api/generators/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ active }) }),
   deleteGenerator: (id: string) => j<{ ok: boolean }>(`/api/generators/${encodeURIComponent(id)}`, { method: "DELETE" }),
   runGenerator: (id: string) => j<{ ok: boolean; result?: PublishResult; error?: string }>(`/api/generators/${encodeURIComponent(id)}/run`, post()),
+  bulkGenerators: (active: boolean, tool?: string) =>
+    jr<{ ok: boolean; updated?: number; error?: string }>("/api/generators/bulk", post({ active, tool_id: tool ?? null })),
 
   // -- persisted state (resource store) -------------------------------------
   toolState: (tool: string) => j<ToolStateResponse>(`/api/resources/${encodeURIComponent(tool)}`),
