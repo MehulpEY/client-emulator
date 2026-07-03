@@ -4,11 +4,14 @@ import { tryQuery, q, dbAvailable, SCHEMA } from "@/lib/db";
 import { getTool } from "@/lib/tools/registry";
 import { invalidateRuntimeCache } from "@/lib/engine/runtime";
 import type { ApiKeyRow } from "@/lib/types";
+import { requireApiAdmin } from "@/lib/auth/guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const auth = await requireApiAdmin();
+  if ("res" in auth) return auth.res;
   if (!dbAvailable()) return NextResponse.json({ reachable: false, keys: [] });
   const tool = req.nextUrl.searchParams.get("tool");
   const keys = tool
@@ -18,6 +21,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireApiAdmin();
+  if ("res" in auth) return auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const body = await req.json().catch(() => ({}));
   const toolId: string | null = body.tool_id ?? null;

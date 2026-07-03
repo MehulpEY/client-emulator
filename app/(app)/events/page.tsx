@@ -12,7 +12,7 @@ export default function EventsPage() {
       <PageHeader
         eyebrow="Pub / Sub"
         title="Event Subscriptions"
-        description="Register a consumer (an agent's webhook URL) to receive a tool's events. Events fire when an agent mutates data through a tool, or when you emit one manually — each delivery is HMAC-signed and logged."
+        description="Register a consumer (an agent's webhook URL) to receive a tool's events. Events fire when an agent mutates data through a tool, or when you emit one manually - each delivery is HMAC-signed and logged."
       />
       <SubscriptionsClient tools={tools} baseUrl={baseUrl} />
     </div>

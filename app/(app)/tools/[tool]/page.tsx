@@ -59,7 +59,7 @@ export default function ToolDetailPage({ params }: { params: { tool: string } })
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-hair pt-3">
-          <span className="chip" title="Authentication scheme"><ShieldCheck size={12} /> {AUTH_LABEL[tool.auth?.type ?? "none"]}{tool.auth?.param ? ` · ${tool.auth.param}` : ""}</span>
+          <span className="chip" title="Authentication scheme"><ShieldCheck size={12} /> {AUTH_LABEL[tool.auth?.type ?? "none"]}{tool.auth?.param ? ` | ${tool.auth.param}` : ""}</span>
           <span className="chip">{endpoints.length} endpoints</span>
           <div className="mono flex min-w-0 items-center gap-2 text-[11.5px] text-text2">
             <span className="label shrink-0">Base URL</span>
@@ -72,18 +72,27 @@ export default function ToolDetailPage({ params }: { params: { tool: string } })
         </div>
       </div>
 
-      {/* Console + side rail */}
-      <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
-        <div className="min-w-0">
-          <EndpointConsole toolId={tool.id} basePath={basePath(tool.id)} auth={tool.auth ?? { type: "none" }} endpoints={endpoints} />
-        </div>
-        <div className="space-y-4">
-          <ToolKeys toolId={tool.id} />
+      {/* Interactive console - the primary surface, full width */}
+      <div className="min-w-0">
+        <EndpointConsole toolId={tool.id} basePath={basePath(tool.id)} auth={tool.auth ?? { type: "none" }} endpoints={endpoints} />
+      </div>
+
+      {/* Supporting panels - balanced two-column grid so nothing runs off in a lone tall rail.
+          Columns pair a taller panel with a shorter one to keep heights even. */}
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
+        <div className="min-w-0 space-y-4">
           <ToolEvents toolId={tool.id} />
-          <ToolAutomation toolId={tool.id} />
           <ToolState toolId={tool.id} />
-          <ToolLogs toolId={tool.id} />
         </div>
+        <div className="min-w-0 space-y-4">
+          <ToolAutomation toolId={tool.id} />
+          <ToolKeys toolId={tool.id} />
+        </div>
+      </div>
+
+      {/* Request trace - full width; a log list reads best wide */}
+      <div className="mt-4 min-w-0">
+        <ToolLogs toolId={tool.id} />
       </div>
     </div>
   );

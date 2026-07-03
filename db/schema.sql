@@ -191,3 +191,28 @@ CREATE TABLE IF NOT EXISTS resources (
     UNIQUE (tool_id, collection, resource_id)
 );
 CREATE INDEX IF NOT EXISTS resources_lookup_idx ON resources (tool_id, collection, created_at DESC);
+
+-- ============================================================================
+-- users — dashboard accounts (auth + RBAC). Two roles: administrator (full
+-- control: API keys, DB seed, user onboarding, everything) and consumer
+-- (observe the emulator + configure pub/sub). Passwords are scrypt-hashed.
+-- An invited user has no password until they accept their emailed invite; the
+-- invite token is stored only as a sha256 hash. Email is unique (case-insensitive).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS users (
+    user_id           text PRIMARY KEY,                 -- 'usr_...'
+    email             text NOT NULL,
+    name              text NOT NULL DEFAULT '',
+    role              text NOT NULL DEFAULT 'consumer'
+                        CHECK (role IN ('administrator','consumer')),
+    password_hash     text,                             -- scrypt hash; NULL until onboarded
+    status            text NOT NULL DEFAULT 'invited'
+                        CHECK (status IN ('invited','active','disabled')),
+    invite_token_hash text,                             -- sha256 of the emailed invite token
+    invite_expires_at timestamptz,
+    created_by        text,                             -- user_id of the admin who invited
+    created_at        timestamptz NOT NULL DEFAULT now(),
+    onboarded_at      timestamptz,
+    last_login_at     timestamptz
+);
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_uidx ON users (lower(email));

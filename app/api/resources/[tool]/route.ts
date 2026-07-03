@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { tryQuery, dbAvailable, SCHEMA } from "@/lib/db";
 import { collectionsFor, listResources } from "@/lib/engine/store";
@@ -6,9 +7,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Inspect a tool's persisted state (what its stateful endpoints read from).
-//   GET /api/resources/<tool>                     → collections summary + recent
-//   GET /api/resources/<tool>?collection=incidents → items in one collection
+//   GET /api/resources/<tool>                     -> collections summary + recent
+//   GET /api/resources/<tool>?collection=incidents -> items in one collection
 export async function GET(req: NextRequest, { params }: { params: { tool: string } }) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ reachable: false, collections: [], recent: [] });
 
   const url = new URL(req.url);
@@ -31,6 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: { tool: string
 
 // Clear a tool's state (all collections, or one via ?collection=).
 export async function DELETE(req: NextRequest, { params }: { params: { tool: string } }) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const collection = new URL(req.url).searchParams.get("collection");
   if (collection) {

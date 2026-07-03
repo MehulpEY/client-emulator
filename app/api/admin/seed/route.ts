@@ -1,3 +1,4 @@
+import { requireApiAdmin } from "@/lib/auth/guard";
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { q, dbAvailable, SCHEMA } from "@/lib/db";
@@ -39,6 +40,11 @@ async function seed() {
     tb.params
   );
 
+  // Prune tools no longer in the code catalog (source of truth). Cascades to
+  // endpoints, per-tool api_keys and scenarios via ON DELETE CASCADE, so a
+  // narrowed catalog doesn't leave orphan rows behind.
+  await q(`delete from ${SCHEMA}.tools where tool_id <> all($1::text[])`, [TOOLS.map((t) => t.id)]);
+
   const endpointRows: any[][] = [];
   for (const t of TOOLS) {
     let sort = 0;
@@ -66,7 +72,12 @@ async function seed() {
     );
   }
 
-  // Master key (works for every tool) — create one if none exists.
+  // Prune stale endpoints for kept tools whose endpoint set changed (the tools
+  // prune above only cascades endpoints for *removed* tools). Every current
+  // endpoint has a deterministic endpoint_id, so anything not in this set is dead.
+  await q(`delete from ${SCHEMA}.endpoints where endpoint_id <> all($1::text[])`, [endpointRows.map((r) => r[0])]);
+
+  // Master key (works for every tool) - create one if none exists.
   const [{ count }] = await q<{ count: string }>(`select count(*)::text count from ${SCHEMA}.api_keys where tool_id is null`);
   let masterSecret: string | undefined;
   if (Number(count) === 0) {
@@ -85,6 +96,8 @@ async function seed() {
 }
 
 export async function POST() {
+  const _auth = await requireApiAdmin();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   try {
     const result = await seed();
@@ -95,5 +108,7 @@ export async function POST() {
 }
 
 export async function GET() {
+  const _auth = await requireApiAdmin();
+  if ("res" in _auth) return _auth.res;
   return NextResponse.json({ message: "POST to this endpoint to seed the catalog + master key into Supabase." });
 }

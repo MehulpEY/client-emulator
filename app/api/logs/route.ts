@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { tryQuery, q, dbAvailable, SCHEMA } from "@/lib/db";
 import type { LogRow } from "@/lib/types";
@@ -6,6 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ reachable: false, logs: [] });
 
   const sp = req.nextUrl.searchParams;
@@ -33,6 +36,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, deleted: 0 });
   const tool = req.nextUrl.searchParams.get("tool");
   try {
