@@ -1,19 +1,44 @@
-import type { ToolDef, ToolEndpoint } from "./types";
+import type { ToolDef, ToolEndpoint, EndpointParam } from "./types";
 import { basePath } from "./types";
-import { GENERIC_TOOLS } from "./generic";
 import { virustotal } from "./crafted/virustotal";
-import { abuseipdb } from "./crafted/abuseipdb";
 import { crowdstrike } from "./crafted/crowdstrike";
-import { twocaptcha } from "./crafted/twocaptcha";
-import { qradar } from "./crafted/qradar";
 import { qualys } from "./crafted/qualys";
-import { hybridanalysis } from "./crafted/hybridanalysis";
-import { nightfall } from "./crafted/nightfall";
+import { entra } from "./crafted/entra";
+import { forcepoint } from "./crafted/forcepoint";
+import { recordedFuture } from "./crafted/recordedfuture";
+import { trellixEpo } from "./crafted/trellix";
+import { ciscoMeraki } from "./crafted/meraki";
+import { ciscoUmbrella } from "./crafted/umbrella";
+import { digicert } from "./crafted/digicert";
+import { zscalerZpa } from "./crafted/zscaler-zpa";
+import { zscalerZia } from "./crafted/zscaler-zia";
+import { zscalerRba } from "./crafted/zscaler-rba";
+import { zscalerAiGuard } from "./crafted/zscaler-aiguard";
+import { appomniAgentGuard } from "./crafted/appomni";
 
-const CRAFTED: ToolDef[] = [virustotal, abuseipdb, crowdstrike, twocaptcha, qradar, qualys, hybridanalysis, nightfall];
+// The catalog is a curated set of high-fidelity, hand-crafted tools. Each one
+// mirrors its real vendor API (paths, auth, field names) with deterministic,
+// seeded responses; several are stateful (persisted resource store).
+const CRAFTED: ToolDef[] = [
+  virustotal,
+  crowdstrike,
+  qualys,
+  entra,
+  forcepoint,
+  recordedFuture,
+  trellixEpo,
+  ciscoMeraki,
+  ciscoUmbrella,
+  digicert,
+  zscalerZpa,
+  zscalerZia,
+  zscalerRba,
+  zscalerAiGuard,
+  appomniAgentGuard,
+];
 
 /** The full catalog, alphabetical by display name. Code is the source of truth. */
-export const TOOLS: ToolDef[] = [...CRAFTED, ...GENERIC_TOOLS].sort((a, b) =>
+export const TOOLS: ToolDef[] = [...CRAFTED].sort((a, b) =>
   a.name.localeCompare(b.name)
 );
 
@@ -72,7 +97,7 @@ export function allSummaries(): ToolSummary[] {
   return TOOLS.map(toolSummary);
 }
 
-/** Full endpoint view for the detail page (no `respond` fn — not serializable). */
+/** Full endpoint view for the detail page (no `respond` fn - not serializable). */
 export interface EndpointView {
   method: ToolEndpoint["method"];
   path: string;
@@ -83,6 +108,7 @@ export interface EndpointView {
   hasHandler: boolean;
   request?: any;
   responseExample?: any;
+  params?: EndpointParam[];
 }
 
 export function endpointViews(t: ToolDef): EndpointView[] {
@@ -96,6 +122,7 @@ export function endpointViews(t: ToolDef): EndpointView[] {
     hasHandler: typeof e.respond === "function",
     request: e.request,
     responseExample: e.responseExample,
+    params: e.params,
   }));
 }
 
