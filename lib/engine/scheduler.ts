@@ -132,15 +132,25 @@ export async function runDueGenerators(): Promise<{ checked: number; fired: numb
     if (!due) continue;
     const tool = getTool(g.tool_id);
     if (!tool) continue;
+    // Atomic claim: advance the schedule ONLY while this generator is still due
+    // at the DB. If a concurrent tick (overlapping cron calls, a retry, or a
+    // persistent host also ticking) already advanced next_run_at, this UPDATE
+    // matches 0 rows - so that caller skips and the event fires exactly once.
+    const next = new Date(now + delayFor(g)).toISOString();
+    const claimed = await tryQuery<{ generator_id: string }>(
+      `update ${SCHEMA}.generators
+          set run_count = run_count + 1, last_run_at = now(), next_run_at = $2
+        where generator_id = $1
+          and active = true
+          and (next_run_at is null or next_run_at <= now())
+        returning generator_id`,
+      [g.generator_id, next],
+    );
+    if (claimed.length === 0) continue; // another tick already claimed this run
     try {
       const data = g.payload_override ?? buildEventPayload(tool, g.event_type);
       await publishEvent({ toolId: tool.id, toolSlug: tool.id, eventType: g.event_type, data, source: "simulator" });
     } catch { /* swallow - best effort */ }
-    const next = new Date(now + delayFor(g)).toISOString();
-    await tryQuery(
-      `update ${SCHEMA}.generators set run_count = run_count + 1, last_run_at = now(), next_run_at = $2 where generator_id = $1`,
-      [g.generator_id, next],
-    );
     fired++;
   }
   return { checked: rows.length, fired };
