@@ -1,12 +1,13 @@
 import { TOOLS } from "@/lib/tools/registry";
 import { PageHeader } from "@/components/PageHeader";
 import { SubscriptionsClient } from "@/components/events/SubscriptionsClient";
+import { getBaseUrl } from "@/lib/base-url";
 
 export const dynamic = "force-dynamic";
 
 export default function EventsPage() {
   const tools = TOOLS.map((t) => ({ id: t.id, name: t.name }));
-  const baseUrl = process.env.NEXT_PUBLIC_EMULATOR_BASE_URL || "http://localhost:3002";
+  const baseUrl = getBaseUrl();
   return (
     <div>
       <PageHeader
