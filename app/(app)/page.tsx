@@ -8,11 +8,12 @@ import { CategoryIcon } from "@/lib/icons";
 import { OverviewStats } from "@/components/overview/OverviewStats";
 import { RecentActivity } from "@/components/overview/RecentActivity";
 import { GettingStarted } from "@/components/overview/GettingStarted";
+import { getBaseUrl } from "@/lib/base-url";
 
 export const dynamic = "force-dynamic";
 
 export default function OverviewPage() {
-  const baseUrl = process.env.NEXT_PUBLIC_EMULATOR_BASE_URL || "http://localhost:3001";
+  const baseUrl = getBaseUrl();
   const counts = CATEGORIES.map((c) => ({ ...c, count: TOOLS.filter((t) => t.category === c.id).length }))
     .filter((c) => c.count > 0)
     .sort((a, b) => b.count - a.count);

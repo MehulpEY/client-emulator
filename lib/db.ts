@@ -10,28 +10,49 @@ import { Pool } from "pg";
 
 const SCHEMA = process.env.DB_SCHEMA || "emulator";
 
+/** True on Vercel / AWS Lambda, where each instance keeps its own pg pool. */
+function isServerless(): boolean {
+  return !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV);
+}
+
 function connectionString(): string {
-  // node-postgres can choke on Neon/Supabase `channel_binding=require`; strip it.
-  return (process.env.DATABASE_URL || "")
+  let url = (process.env.DATABASE_URL || "")
+    // node-postgres can choke on Neon/Supabase `channel_binding=require`; strip it.
     .replace(/([?&])channel_binding=[^&]*/g, "$1")
     .replace(/[?&]$/, "");
+  // On serverless (Vercel), the Supabase SESSION pooler (port 5432) allocates a
+  // dedicated connection per client and is capped (pool_size 15), so concurrent
+  // function instances exhaust it -> "EMAXCONNSESSION". The TRANSACTION pooler
+  // (port 6543) multiplexes over few backend connections and has no per-client
+  // cap; auto-upgrade recognized Supabase pooler hosts so serverless deploys work.
+  if (isServerless()) {
+    url = url.replace(/(\.pooler\.supabase\.com):5432\b/i, "$1:6543");
+  }
+  return url;
 }
 
 let _pool: Pool | undefined;
 function pool(): Pool {
   if (!_pool) {
+    const serverless = isServerless();
     _pool = new Pool({
       connectionString: connectionString(),
       ssl: { rejectUnauthorized: false },
-      max: 5,
+      // Serverless: each instance serves one request at a time, so a single
+      // connection per instance keeps total usage tiny across the fleet. A
+      // long-lived server can afford a small pool.
+      max: serverless ? 1 : 5,
       // The Supabase pooler's first TLS+auth handshake from a distant network can
       // take ~10s; give it room so a cold start doesn't trip the breaker. Queries
       // schema-qualify their tables, so no search_path/`options` is needed.
       connectionTimeoutMillis: 15000,
-      // Retire idle connections before the session pooler drops them server-side
-      // (a dropped idle connection otherwise surfaces as an intermittent error on
+      // Retire idle connections before the pooler drops them server-side (a
+      // dropped idle connection otherwise surfaces as an intermittent error on
       // the next reuse). keepAlive keeps live sockets from going idle-stale.
-      idleTimeoutMillis: 30000,
+      idleTimeoutMillis: serverless ? 10000 : 30000,
+      // Let the pool release its connection when idle so a frozen/reused
+      // serverless instance doesn't hold a backend connection between invocations.
+      allowExitOnIdle: serverless,
       keepAlive: true,
     });
     _pool.on("error", () => { /* swallow idle-client errors; breaker handles it */ });

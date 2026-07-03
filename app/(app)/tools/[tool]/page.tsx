@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Cpu, Sparkles, BookOpen, ShieldCheck } from "lucide-react";
 import { getTool, endpointViews, basePath } from "@/lib/tools/registry";
+import { getBaseUrl } from "@/lib/base-url";
 import { categoryLabel } from "@/lib/tools/categories";
 import { CategoryIcon } from "@/lib/icons";
 import { Chip, CopyButton, Eyebrow } from "@/components/ui";
@@ -27,7 +28,7 @@ export default function ToolDetailPage({ params }: { params: { tool: string } })
   if (!tool) notFound();
 
   const endpoints = endpointViews(tool);
-  const base = (process.env.NEXT_PUBLIC_EMULATOR_BASE_URL || "http://localhost:3001") + basePath(tool.id);
+  const base = getBaseUrl() + basePath(tool.id);
 
   return (
     <div>
