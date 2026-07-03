@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Cpu, Sparkles, BookOpen, ShieldCheck } from "lucide-react";
 import { getTool, endpointViews, basePath } from "@/lib/tools/registry";
 import { getBaseUrl } from "@/lib/base-url";
+import { isServerless } from "@/lib/db";
 import { categoryLabel } from "@/lib/tools/categories";
 import { CategoryIcon } from "@/lib/icons";
 import { Chip, CopyButton, Eyebrow } from "@/components/ui";
@@ -86,7 +87,7 @@ export default function ToolDetailPage({ params }: { params: { tool: string } })
           <ToolState toolId={tool.id} />
         </div>
         <div className="min-w-0 space-y-4">
-          <ToolAutomation toolId={tool.id} />
+          <ToolAutomation toolId={tool.id} serverless={isServerless()} />
           <ToolKeys toolId={tool.id} />
         </div>
       </div>
