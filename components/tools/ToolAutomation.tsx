@@ -8,18 +8,22 @@ import { Panel, SkeletonText, EmptyState, Chip, Spinner, useConfirm } from "@/co
 import { relativeTime, untilTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
-export function ToolAutomation({ toolId }: { toolId: string }) {
+export function ToolAutomation({ toolId, serverless = false }: { toolId: string; serverless?: boolean }) {
   const confirm = useConfirm();
   const [gens, setGens] = useState<GeneratorRow[] | null>(null);
   const [reachable, setReachable] = useState(true);
   const [events, setEvents] = useState<EventTypeView[]>([]);
 
+  // On serverless the scheduler is cron-driven (~1 minute), so sub-minute
+  // intervals can't be honored - floor the form at 60s there.
+  const minSec = serverless ? 60 : 2;
+
   // form state
   const [eventType, setEventType] = useState("");
   const [mode, setMode] = useState<"fixed" | "random">("random");
-  const [interval, setIntervalS] = useState(30);
-  const [minS, setMinS] = useState(15);
-  const [maxS, setMaxS] = useState(60);
+  const [interval, setIntervalS] = useState(serverless ? 60 : 30);
+  const [minS, setMinS] = useState(serverless ? 60 : 15);
+  const [maxS, setMaxS] = useState(serverless ? 300 : 60);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,17 +92,17 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
         {mode === "fixed" ? (
           <label className="block">
             <span className="mb-1 block text-[11px] text-text3">Interval (seconds)</span>
-            <input type="number" min={2} className="field" value={interval} onChange={(e) => setIntervalS(Math.max(2, Number(e.target.value) || 2))} />
+            <input type="number" min={minSec} className="field" value={interval} onChange={(e) => setIntervalS(Math.max(minSec, Number(e.target.value) || minSec))} />
           </label>
         ) : (
           <div className="grid grid-cols-2 gap-2">
             <label className="block">
               <span className="mb-1 block text-[11px] text-text3">Min (s)</span>
-              <input type="number" min={2} className="field" value={minS} onChange={(e) => setMinS(Math.max(2, Number(e.target.value) || 2))} />
+              <input type="number" min={minSec} className="field" value={minS} onChange={(e) => setMinS(Math.max(minSec, Number(e.target.value) || minSec))} />
             </label>
             <label className="block">
               <span className="mb-1 block text-[11px] text-text3">Max (s)</span>
-              <input type="number" min={2} className="field" value={maxS} onChange={(e) => setMaxS(Math.max(2, Number(e.target.value) || 2))} />
+              <input type="number" min={minSec} className="field" value={maxS} onChange={(e) => setMaxS(Math.max(minSec, Number(e.target.value) || minSec))} />
             </label>
           </div>
         )}
@@ -109,6 +113,11 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
         <p className="text-[10.5px] leading-relaxed text-text3">
           Auto-emits this event on a schedule (then delivered to matching subscriptions). Configure a subscription to route it to an agent.
         </p>
+        {serverless ? (
+          <p className="text-[10.5px] leading-relaxed text-accent-fg">
+            This deployment is serverless (cron-driven), so the minimum interval is 60s.
+          </p>
+        ) : null}
       </div>
 
       {/* Active generators */}
