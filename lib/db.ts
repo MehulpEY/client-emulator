@@ -11,7 +11,7 @@ import { Pool } from "pg";
 const SCHEMA = process.env.DB_SCHEMA || "emulator";
 
 /** True on Vercel / AWS Lambda, where each instance keeps its own pg pool. */
-function isServerless(): boolean {
+export function isServerless(): boolean {
   return !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.AWS_EXECUTION_ENV);
 }
 
