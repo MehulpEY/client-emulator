@@ -20,3 +20,9 @@ export { Spinner, SectionLabel, Eyebrow, SpectrumLine, EmptyState } from "./Feed
 
 export { Brand } from "./Brand";
 export { CopyButton } from "./CopyButton";
+
+export { Modal } from "./Modal";
+export type { ModalProps } from "./Modal";
+export { ConfirmProvider, useConfirm } from "./ConfirmProvider";
+export type { ConfirmOptions } from "./ConfirmProvider";
+export { JsonViewer, JsonViewerButton } from "./JsonViewer";

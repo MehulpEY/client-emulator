@@ -95,7 +95,7 @@ function CreateSubscription({ tools, baseUrl, onCreated }: { tools: Tool[]; base
         </label>
         {error && <div className="border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">{error}</div>}
         <button className="btn-primary w-full" onClick={create} disabled={busy || !targetUrl}>
-          {busy ? <Spinner label="Creating…" /> : <><Webhook size={14} /> Subscribe</>}
+          {busy ? <Spinner label="Creating..." /> : <><Webhook size={14} /> Subscribe</>}
         </button>
         <p className="text-[11px] leading-relaxed text-text3">
           Deliveries are POSTed with an HMAC <span className="mono">x-emulator-signature</span> header you can verify with the subscription secret.
@@ -139,7 +139,7 @@ function EmitTester({ tools, onEmitted }: { tools: Tool[]; onEmitted: () => void
           </label>
         </div>
         <button className="btn-primary w-full" onClick={emit} disabled={busy || !eventType}>
-          {busy ? <Spinner label="Publishing…" /> : <><Send size={14} /> Emit to subscribers</>}
+          {busy ? <Spinner label="Publishing..." /> : <><Send size={14} /> Emit to subscribers</>}
         </button>
         {result && (
           <div className="sunk p-3">
@@ -152,7 +152,7 @@ function EmitTester({ tools, onEmitted }: { tools: Tool[]; onEmitted: () => void
             {result.matched === 0 && <p className="mt-2 text-[11.5px] text-text3">No active subscription matched this tool/event. Create one above (try the demo consumer).</p>}
             {result.deliveries.map((d) => (
               <div key={d.delivery_id} className="mono mt-1.5 truncate text-[10.5px] text-text3">
-                {d.status === "delivered" ? "✓" : "✗"} {d.target_url} {d.response_status ? `(${d.response_status})` : d.error ? `(${d.error})` : ""}
+                {d.status === "delivered" ? "ok" : "fail"} {d.target_url} {d.response_status ? `(${d.response_status})` : d.error ? `(${d.error})` : ""}
               </div>
             ))}
           </div>

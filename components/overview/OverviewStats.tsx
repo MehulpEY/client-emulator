@@ -29,14 +29,14 @@ export function OverviewStats({ catalogFallback }: { catalogFallback: { tools: n
       <Stat label="AI-Tool Surfaces" value={cat?.aiTools ?? catalogFallback.aiTools} icon={<Cpu size={16} />} tone="accent" sub="callable by agents" />
       <Stat
         label="Requests (24h)"
-        value={db?.reachable ? db.last24h : "—"}
+        value={db?.reachable ? db.last24h : "-"}
         icon={<Activity size={16} />}
         tone="info"
-        sub={db?.reachable ? `${db.totalRequests} total logged` : "DB offline"}
+        sub={db?.reachable ? `${db.totalRequests} total logged` : db ? "DB offline" : "no data yet"}
       />
       <Stat
         label="Error Rate"
-        value={db?.reachable ? `${Math.round((db.errorRate || 0) * 100)}%` : "—"}
+        value={db?.reachable ? `${Math.round((db.errorRate || 0) * 100)}%` : "-"}
         icon={<AlertTriangle size={16} />}
         tone={db?.reachable && db.errorRate > 0.25 ? "danger" : "default"}
         sub={db?.reachable ? "of logged calls" : "awaiting traffic"}

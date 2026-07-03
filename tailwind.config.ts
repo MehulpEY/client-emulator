@@ -7,7 +7,7 @@ import type { Config } from "tailwindcss";
  * file only exposes them to Tailwind's utility generator.
  *
  * Doctrine (shared with the reference design system): enterprise /
- * "confident" — squared (the radius scale is zeroed so every `rounded-*` is
+ * "confident" - squared (the radius scale is zeroed so every `rounded-*` is
  * sharp), flat, hairline borders, electric-yellow accent, Arial type. Depth
  * comes from the glass/aurora/glow primitives in `globals.css`, not rounding.
  */
@@ -17,7 +17,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ── canvas / surfaces ───────────────────────────────────────────────
+        // -- canvas / surfaces -----------------------------------------------
         bg: "var(--bg)",
         canvas: "var(--bg)",
         surface: "var(--surface)",
@@ -28,11 +28,11 @@ const config: Config = {
         border: "var(--border)",
         borderStrong: "var(--border-strong)",
         hair: "var(--hair)",
-        // ── type ────────────────────────────────────────────────────────────
+        // -- type ------------------------------------------------------------
         text: "var(--text)",
         text2: "var(--text-2)",
         text3: "var(--text-3)",
-        // ── brand accent ────────────────────────────────────────────────────
+        // -- brand accent ----------------------------------------------------
         accent: {
           DEFAULT: "var(--accent)",
           2: "var(--accent-2)",
@@ -41,7 +41,7 @@ const config: Config = {
           press: "var(--accent-press)",
           fg: "var(--accent-fg)",
         },
-        // ── state semantics ─────────────────────────────────────────────────
+        // -- state semantics -------------------------------------------------
         ok: { DEFAULT: "var(--ok)", bg: "var(--ok-bg)", line: "var(--ok-line)" },
         info: { DEFAULT: "var(--info)", bg: "var(--info-bg)", line: "var(--info-line)" },
         warn: { DEFAULT: "var(--warn)", bg: "var(--warn-bg)", line: "var(--warn-line)" },
@@ -52,7 +52,7 @@ const config: Config = {
           medium: "var(--sev-medium)", "medium-bg": "var(--sev-medium-bg)", "medium-line": "var(--sev-medium-line)",
           low: "var(--sev-low)", "low-bg": "var(--sev-low-bg)", "low-line": "var(--sev-low-line)",
         },
-        // ── aliases kept so older markup re-skins automatically ──────────────
+        // -- aliases kept so older markup re-skins automatically --------------
         panel: "var(--surface)",
         ink: "var(--text)",
         muted: "var(--text-2)",

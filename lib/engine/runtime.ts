@@ -66,7 +66,7 @@ export async function checkAuth(tool: ToolDef, headers: Record<string, string>, 
   if ((tool.auth?.type ?? "none") === "none") return { authorized: true, open: true };
   const keys = await loadKeys();
   const valid = keys.filter((k) => k.tool_id === tool.id || k.tool_id === null).map((k) => k.secret);
-  // No keys seeded (or DB unreachable) → open dev mode so agents work immediately.
+  // No keys seeded (or DB unreachable) -> open dev mode so agents work immediately.
   if (valid.length === 0) return { authorized: true, open: true };
   const presented = presentedCredential(tool, headers, query);
   return { authorized: !!presented && valid.includes(presented), open: false };

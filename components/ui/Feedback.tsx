@@ -17,7 +17,7 @@ export function SectionLabel({ children, className = "" }: { children: ReactNode
   return <div className={cn("label mb-3", className)}>{children}</div>;
 }
 
-/** Signature eyebrow — yellow square + uppercase micro-label. */
+/** Signature eyebrow - yellow square + uppercase micro-label. */
 export function Eyebrow({ children, accent = false, className }: { children: ReactNode; accent?: boolean; className?: string }) {
   return <span className={cn("eyebrow", accent && "accent", className)}>{children}</span>;
 }

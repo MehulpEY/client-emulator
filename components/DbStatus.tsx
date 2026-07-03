@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
 /** Live Supabase connectivity dot, shown in the top bar. */
 export function DbStatus() {
   const [state, setState] = useState<"loading" | "ok" | "down">("loading");
-  const [detail, setDetail] = useState<string>("Checking database…");
+  const [detail, setDetail] = useState<string>("Checking database...");
 
   useEffect(() => {
     let alive = true;
@@ -16,10 +16,11 @@ export function DbStatus() {
       try {
         const h = await api.health();
         if (!alive) return;
-        if (h.db.reachable) { setState("ok"); setDetail(`Supabase · ${h.db.schema} schema`); }
+        if (h.db.reachable) { setState("ok"); setDetail(`Supabase | ${h.db.schema} schema`); }
         else { setState("down"); setDetail(h.db.error ? `DB unreachable: ${h.db.error}` : "Database unreachable"); }
       } catch {
-        if (alive) { setState("down"); setDetail("Health check failed"); }
+        // Transient (network / 500): keep the last known status rather than
+        // flashing "offline". A genuine outage surfaces as reachable:false above.
       }
     };
     check();
@@ -34,7 +35,7 @@ export function DbStatus() {
     <span className="chip gap-2" title={detail}>
       <Database size={12} className={tone} />
       <span className={cn("h-1.5 w-1.5 rounded-full", dot, state === "loading" && "animate-blink")} />
-      <span className="hidden sm:inline">{state === "ok" ? "DB live" : state === "down" ? "DB offline" : "DB…"}</span>
+      <span className="hidden sm:inline">{state === "ok" ? "DB live" : state === "down" ? "DB offline" : "DB..."}</span>
     </span>
   );
 }

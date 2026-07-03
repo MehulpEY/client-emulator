@@ -13,7 +13,7 @@ export function CopyButton({ value, label, className }: { value: string; label?:
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
     } catch {
-      /* clipboard unavailable (insecure context) — no-op */
+      /* clipboard unavailable (insecure context) - no-op */
     }
   }
   return (

@@ -4,18 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { Database, RefreshCw, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ToolStateResponse } from "@/lib/types";
-import { Panel, SkeletonText, Chip } from "@/components/ui";
+import { Panel, SkeletonText, Chip, useConfirm, JsonViewerButton } from "@/components/ui";
 import { relativeTime, prettyJson } from "@/lib/format";
 
-// Read-only view of a tool's persisted state — the records its stateful GET
+// Read-only view of a tool's persisted state - the records its stateful GET
 // endpoints return. Generated/created events land here, so this is the proof
 // that "call the API normally and see the same data" works.
 export function ToolState({ toolId }: { toolId: string }) {
+  const confirm = useConfirm();
   const [state, setState] = useState<ToolStateResponse | null>(null);
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(
-    () => api.toolState(toolId).then(setState).catch(() => setState({ reachable: false, collections: [], recent: [] })),
+    () => api.toolState(toolId).then(setState).catch(() => { /* transient error: keep last state, retry on next poll */ }),
     [toolId],
   );
 
@@ -26,7 +27,7 @@ export function ToolState({ toolId }: { toolId: string }) {
   }, [load]);
 
   async function clearAll() {
-    if (!confirm("Clear all persisted records for this tool?")) return;
+    if (!(await confirm({ title: "Clear persisted state", message: "Clear all persisted records for this tool? This removes the stored data its GET endpoints return.", confirmLabel: "Clear all", danger: true }))) return;
     await api.clearState(toolId);
     await load();
   }
@@ -47,7 +48,7 @@ export function ToolState({ toolId }: { toolId: string }) {
       {state === null ? (
         <SkeletonText lines={2} />
       ) : !state.reachable ? (
-        <div className="text-[11.5px] text-text3">Database offline — state lives in Supabase.</div>
+        <div className="text-[11.5px] text-text3">Database offline - state lives in Supabase.</div>
       ) : !hasState ? (
         <div className="py-2 text-center text-[11.5px] leading-relaxed text-text3">
           No stored records yet. Created / generated events persist here and are returned by this tool&apos;s GET endpoints.
@@ -56,18 +57,21 @@ export function ToolState({ toolId }: { toolId: string }) {
         <div className="space-y-3">
           <div className="flex flex-wrap gap-1.5">
             {state.collections.map((c) => (
-              <Chip key={c.collection} variant="accent">{c.collection} · {c.count}</Chip>
+              <Chip key={c.collection} variant="accent">{c.collection} | {c.count}</Chip>
             ))}
           </div>
           <div className="space-y-1.5">
             <div className="label">Most recent</div>
             {state.recent.map((r) => (
               <div key={r.collection + r.resource_id} className="sunk p-2">
-                <button className="flex w-full items-center gap-2 text-left" onClick={() => setOpen(open === r.resource_id ? null : r.resource_id)}>
-                  <span className="mono min-w-0 flex-1 truncate text-[11.5px] font-bold">{r.resource_id}</span>
-                  {r.data?.status ? <Chip variant="muted">{String(r.data.status)}</Chip> : null}
-                  <span className="shrink-0 text-[10px] text-text3">{relativeTime(r.updated_at)}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => setOpen(open === r.resource_id ? null : r.resource_id)}>
+                    <span className="mono min-w-0 flex-1 truncate text-[11.5px] font-bold">{r.resource_id}</span>
+                    {r.data?.status ? <Chip variant="muted">{String(r.data.status)}</Chip> : null}
+                    <span className="shrink-0 text-[10px] text-text3">{relativeTime(r.updated_at)}</span>
+                  </button>
+                  <JsonViewerButton value={r.data} title={r.resource_id} label="" className="!w-6 shrink-0 !px-0" />
+                </div>
                 {open === r.resource_id && (
                   <pre className="mono mt-1.5 max-h-56 overflow-auto whitespace-pre-wrap break-all border-t border-hair pt-1.5 text-[10.5px] text-text2">{prettyJson(r.data)}</pre>
                 )}

@@ -24,7 +24,7 @@ function Row({ e }: { e: DemoEvent }) {
         <div className="space-y-2 bg-surface-sunk px-4 py-3">
           <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] text-text3">
             <Chip variant="muted">delivery {e.delivery}</Chip>
-            <span className="mono truncate" title={e.signature || ""}>sig {(e.signature || "").slice(0, 22)}…</span>
+            <span className="mono truncate" title={e.signature || ""}>sig {(e.signature || "").slice(0, 22)}...</span>
           </div>
           <pre className="emu-scroll mono max-h-64 overflow-auto bg-surface p-2.5 text-[11px] leading-relaxed text-text2">{prettyJson(e.body)}</pre>
         </div>
@@ -36,7 +36,7 @@ function Row({ e }: { e: DemoEvent }) {
 export function DemoInbox({ refreshKey }: { refreshKey: number }) {
   const [events, setEvents] = useState<DemoEvent[] | null>(null);
 
-  const load = useCallback(() => api.demoInbox().then((r) => setEvents(r.events)).catch(() => setEvents([])), []);
+  const load = useCallback(() => api.demoInbox().then((r) => setEvents(r.events)).catch(() => { /* transient error: keep last state, retry on next poll */ }), []);
   useEffect(() => {
     load();
     const id = setInterval(load, 5000);
@@ -53,7 +53,7 @@ export function DemoInbox({ refreshKey }: { refreshKey: number }) {
       actions={<button onClick={clear} className="btn-ghost h-7 !text-[11px]"><Trash2 size={12} /> Clear</button>}
     >
       <div className="border-b border-hair px-4 py-2 text-[11px] text-text3">
-        Built-in consumer at <span className="mono text-text2">/api/consumer/demo</span> — subscribe to it to see deliveries land here.
+        Built-in consumer at <span className="mono text-text2">/api/consumer/demo</span> - subscribe to it to see deliveries land here.
       </div>
       {events === null ? (
         <SkeletonRows rows={4} />

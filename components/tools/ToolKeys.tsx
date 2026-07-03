@@ -14,7 +14,7 @@ export function ToolKeys({ toolId }: { toolId: string }) {
   function load() {
     return api.keys(toolId)
       .then((r) => { setKeys(r.keys); setReachable(r.reachable); })
-      .catch(() => { setKeys([]); setReachable(false); });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
   }
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [toolId]);
 
@@ -36,7 +36,7 @@ export function ToolKeys({ toolId }: { toolId: string }) {
         <EmptyState icon={KeyRound} title="Database offline" sub="Keys live in Supabase. Until it's reachable, endpoints accept any key (open dev mode)." />
       ) : keys.length === 0 ? (
         <div className="space-y-2 text-[12px] text-text2">
-          <p>No keys yet — endpoints are <span className="text-accent-fg">open in dev mode</span> (any/no key works). Create one to enforce auth.</p>
+          <p>No keys yet - endpoints are <span className="text-accent-fg">open in dev mode</span> (any/no key works). Create one to enforce auth.</p>
         </div>
       ) : (
         <div className="space-y-2">

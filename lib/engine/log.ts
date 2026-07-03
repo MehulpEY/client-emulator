@@ -7,7 +7,7 @@ const SECRET_HEADERS = ["authorization", "x-apikey", "x-api-key", "key", "apikey
 function redactHeaders(headers: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(headers)) {
-    out[k] = SECRET_HEADERS.includes(k.toLowerCase()) && v ? v.slice(0, 4) + "…redacted" : v;
+    out[k] = SECRET_HEADERS.includes(k.toLowerCase()) && v ? v.slice(0, 4) + "...redacted" : v;
   }
   return out;
 }

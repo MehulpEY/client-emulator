@@ -1,6 +1,6 @@
 import type { ToolDef, ToolEndpoint, HttpMethod } from "../tools/types";
 
-/** Split a path into clean segments: "/files/{id}/" → ["files","{id}"]. */
+/** Split a path into clean segments: "/files/{id}/" -> ["files","{id}"]. */
 function segments(path: string): string[] {
   return path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
 }

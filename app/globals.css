@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 /* ============================================================================ *
- * Client Tool Emulator — design system
+ * Client Tool Emulator - design system
  * ----------------------------------------------------------------------------
  * Confident/enterprise doctrine: electric-yellow (#FFE600) accent on a warm
  * near-black canvas. Squared, flat, hairline structure; depth comes from frosted
- * glass, an ambient aurora wash, and a soft accent glow — never from rounding.
+ * glass, an ambient aurora wash, and a soft accent glow - never from rounding.
  * Single primary accent; meaning carried by state colour + icon.
  *
  * The CSS custom properties below are the single source of truth. Tailwind
@@ -16,7 +16,7 @@
  * light / dark automatically.
  * ============================================================================ */
 
-/* ===== Design tokens — LIGHT (default) ===================================== */
+/* ===== Design tokens - LIGHT (default) ===================================== */
 :root, [data-theme="light"] {
   color-scheme: light;
   --bg:#F1F1F5; --surface:#FFFFFF; --surface-2:#FAFAFC; --surface-hover:#F1F1F5; --surface-sunk:#F6F6FA;
@@ -43,7 +43,7 @@
   --blur:14px;
 }
 
-/* ===== Design tokens — DARK (primary experience) ========================== */
+/* ===== Design tokens - DARK (primary experience) ========================== */
 [data-theme="dark"] {
   color-scheme: dark;
   --bg:#0B0B0F; --surface:#16161D; --surface-2:#1C1C25; --surface-hover:#23232E; --surface-sunk:#101016;
@@ -130,7 +130,7 @@ input:-webkit-autofill:focus {
 
 /* ===== Signature visual primitives ========================================= */
 
-/* Ambient gradient canvas — the standard page background. */
+/* Ambient gradient canvas - the standard page background. */
 .bg-aurora {
   background:
     radial-gradient(1200px 600px at 12% -8%, var(--aurora-1), transparent 60%),
@@ -144,7 +144,7 @@ input:-webkit-autofill:focus {
   background-size: 26px 26px;
 }
 
-/* Yellow→amber gradient headline text. */
+/* Yellow->amber gradient headline text. */
 .text-gradient-gold {
   background: linear-gradient(100deg, var(--accent-press) 0%, var(--accent) 42%, var(--accent-2) 100%);
   -webkit-background-clip: text; background-clip: text; color: transparent;
@@ -157,13 +157,13 @@ input:-webkit-autofill:focus {
   -webkit-backdrop-filter: blur(var(--blur)) saturate(118%);
   box-shadow: inset 0 1px 0 0 var(--glass-inset);
 }
-/* Chrome (top bar / sidebar) — denser frosted glass. */
+/* Chrome (top bar / sidebar) - denser frosted glass. */
 .glass-chrome {
   background: var(--glass-chrome);
   backdrop-filter: blur(18px) saturate(120%);
   -webkit-backdrop-filter: blur(18px) saturate(120%);
 }
-/* Modal / drawer surface — far more opaque so detail reads over a busy scrim. */
+/* Modal / drawer surface - far more opaque so detail reads over a busy scrim. */
 .glass-modal {
   background: linear-gradient(180deg, var(--glass-modal-1), var(--glass-modal-2));
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
@@ -180,7 +180,7 @@ input:-webkit-autofill:focus {
 /* Soft accent glow halo behind feature elements. */
 .glow-accent { box-shadow: 0 0 0 1px var(--accent-glow), 0 18px 60px -22px rgba(255,230,0,0.40); }
 
-/* Eyebrow — the signature yellow square + uppercase micro-label. */
+/* Eyebrow - the signature yellow square + uppercase micro-label. */
 .eyebrow {
   display: inline-flex; align-items: center; gap: 9px;
   font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
@@ -189,14 +189,14 @@ input:-webkit-autofill:focus {
 .eyebrow::before { content: ""; width: 11px; height: 11px; flex: none; background: var(--accent); }
 .eyebrow.accent { color: var(--accent); }
 
-/* Spectrum keyline — a thin gradient rule (border/line role only). */
+/* Spectrum keyline - a thin gradient rule (border/line role only). */
 .spectrum-line { height: 3px; width: 100%; background: linear-gradient(90deg, #FFE600, #FF32FF, #32FFFF); }
 .spectrum-line.thin { height: 2px; }
 .spectrum-line.warm { background: linear-gradient(90deg, #FFE600, #FF7D1E, #FF32FF); }
 
 /* ===== Component classes =================================================== */
 @layer components {
-  /* Frosted, squared, hairline panel — the workhorse surface. */
+  /* Frosted, squared, hairline panel - the workhorse surface. */
   .panel {
     background: linear-gradient(180deg, var(--glass-1), var(--glass-2));
     border: 1px solid var(--border);
@@ -226,7 +226,7 @@ input:-webkit-autofill:focus {
   .rowlink { transition: background .15s ease; }
   .rowlink:hover { background: var(--surface-hover); }
 
-  /* Buttons — squared, bold. Primary inverts to a yellow keyline on hover. */
+  /* Buttons - squared, bold. Primary inverts to a yellow keyline on hover. */
   .btn, .btn-primary, .btn-ghost, .btn-danger {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
     height: 32px; padding: 0 13px; font-family: inherit; font-size: 12.5px; font-weight: 700;
@@ -248,7 +248,7 @@ input:-webkit-autofill:focus {
     font-size: 11px; font-weight: 600; color: var(--text-2); white-space: nowrap; line-height: 1;
   }
 
-  /* Vertical nav item — glass hover + yellow keyline when active. */
+  /* Vertical nav item - glass hover + yellow keyline when active. */
   .navitem {
     width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px;
     border: none; background: transparent; color: var(--text-2); cursor: pointer; text-align: left;
@@ -263,7 +263,7 @@ input:-webkit-autofill:focus {
   .row { transition: background .12s ease; }
   .row:hover { background: var(--surface-hover); }
 
-  /* Inputs — hairline that focuses to the accent. */
+  /* Inputs - hairline that focuses to the accent. */
   .field {
     width: 100%; height: 34px; padding: 0 11px; background: var(--surface-sunk); border: 1px solid var(--border);
     color: var(--text); font-family: inherit; font-size: 13px; outline: none; transition: border-color .15s ease;

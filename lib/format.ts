@@ -1,4 +1,4 @@
-/** "3m ago", "2h ago", "just now" — compact relative time. */
+/** "3m ago", "2h ago", "just now" - compact relative time. */
 export function relativeTime(iso: string): string {
   const t = new Date(iso).getTime();
   if (Number.isNaN(t)) return "";
@@ -13,9 +13,9 @@ export function relativeTime(iso: string): string {
   return `${d}d ago`;
 }
 
-/** "in 12s", "in 3m", "due" — compact countdown to a future time. */
+/** "in 12s", "in 3m", "due" - compact countdown to a future time. */
 export function untilTime(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const s = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
   if (s <= 0) return "due";
   if (s < 60) return `in ${s}s`;

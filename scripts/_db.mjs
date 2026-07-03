@@ -11,7 +11,7 @@ export const SCHEMA = process.env.DB_SCHEMA || "emulator";
 function connectionString() {
   const raw = process.env.DATABASE_URL || "";
   if (!raw) {
-    console.error("✖ DATABASE_URL is not set. Copy .env.example → .env and fill it in.");
+    console.error("[x] DATABASE_URL is not set. Copy .env.example -> .env and fill it in.");
     process.exit(1);
   }
   return raw.replace(/([?&])channel_binding=[^&]*/g, "$1").replace(/[?&]$/, "");
@@ -28,12 +28,12 @@ export async function withClient(fn) {
   try {
     await client.connect();
   } catch (err) {
-    console.error("\n✖ Could not connect to Postgres:", err.message);
+    console.error("\n[x] Could not connect to Postgres:", err.message);
     if (/ENETUNREACH|ETIMEDOUT|EHOSTUNREACH|ENOTFOUND/.test(err.code || err.message || "")) {
       console.error(
         "\n  The direct host (db.<ref>.supabase.co:5432) is reachable over IPv6 only.\n" +
         "  On an IPv4-only network, switch DATABASE_URL to the Supabase connection pooler:\n" +
-        "    Project → Settings → Database → Connection pooling → Session mode (port 5432)\n" +
+        "    Project -> Settings -> Database -> Connection pooling -> Session mode (port 5432)\n" +
         "    e.g. postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres\n"
       );
     }

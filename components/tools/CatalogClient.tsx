@@ -41,7 +41,7 @@ export function CatalogClient({ tools, initialCategory }: { tools: ToolSummary[]
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tools, vendors, capabilities…"
+              placeholder="Search tools, vendors, capabilities..."
               className="field !h-9 pl-9"
             />
             {query && (

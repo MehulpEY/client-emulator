@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-/* Skeleton loaders — shown wherever data is being fetched, so the layout never
+/* Skeleton loaders - shown wherever data is being fetched, so the layout never
    flashes empty. The `.skeleton` class (globals.css) carries the themed sheen. */
 
 export function Skeleton({ className = "" }: { className?: string }) {
