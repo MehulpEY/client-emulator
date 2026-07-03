@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { tryQuery, q, dbAvailable, SCHEMA } from "@/lib/db";
 import type { DeliveryRow } from "@/lib/types";
@@ -6,6 +7,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ reachable: false, deliveries: [] });
   const sp = req.nextUrl.searchParams;
   const tool = sp.get("tool");
@@ -27,6 +30,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE() {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, deleted: 0 });
   try {
     const rows = await q<{ count: string }>(`with d as (delete from ${SCHEMA}.event_deliveries returning 1) select count(*)::text from d`);

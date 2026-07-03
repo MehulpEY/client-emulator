@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import { Play, Cpu, Sparkles } from "lucide-react";
 import type { EndpointView } from "@/lib/tools/registry";
 import type { AuthType } from "@/lib/tools/types";
-import { MethodBadge, StatusBadge, Chip, Spinner, CopyButton } from "@/components/ui";
+import { MethodBadge, StatusBadge, Chip, Spinner, CopyButton, JsonViewerButton } from "@/components/ui";
+import { EndpointDocsButton } from "./EndpointDocs";
 import { prettyJson } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
@@ -124,6 +125,7 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
         <div className="flex items-center gap-1.5">
           {ep.aiTool ? <Chip variant="accent" icon={<Cpu size={11} />}>AI tool</Chip> : null}
           {ep.hasHandler ? <Chip variant="ok" icon={<Sparkles size={11} />}>dynamic</Chip> : null}
+          <EndpointDocsButton ep={ep} auth={auth} />
         </div>
       </div>
 
@@ -151,7 +153,10 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
           </label>
         ) : (
           <label className="block">
-            <span className="label mb-1.5 block">Request body (JSON)</span>
+            <span className="mb-1.5 flex items-center justify-between">
+              <span className="label">Request body (JSON)</span>
+              {body.trim() ? <JsonViewerButton value={body} title="Request body" label="Format / validate" /> : null}
+            </span>
             <textarea className="field mono min-h-[110px] text-[12px]" value={body} onChange={(e) => setBody(e.target.value)} placeholder="{}" />
           </label>
         )}
@@ -159,15 +164,15 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
         {auth.type !== "none" && (
           <label className="block">
             <span className="label mb-1.5 block">
-              API key <span className="text-text3">→ sent as {auth.type === "bearer" ? "Authorization: Bearer" : auth.type === "basic" ? "Basic auth" : auth.type === "api_key_query" ? `?${auth.param}` : auth.param}</span>
+              API key <span className="text-text3">{"->"} sent as {auth.type === "bearer" ? "Authorization: Bearer" : auth.type === "basic" ? "Basic auth" : auth.type === "api_key_query" ? `?${auth.param}` : auth.param}</span>
             </span>
-            <input className="field mono" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="optional — open in dev mode until keys are seeded" />
+            <input className="field mono" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="optional - open in dev mode until keys are seeded" />
           </label>
         )}
 
         <div className="flex items-center gap-2">
           <button className="btn-primary" onClick={send} disabled={busy}>
-            {busy ? <Spinner label="Sending…" /> : <><Play size={14} /> Send request</>}
+            {busy ? <Spinner label="Sending..." /> : <><Play size={14} /> Send request</>}
           </button>
           <CopyButton value={resolvedPath()} label="Copy URL" className="h-8 !text-[11px]" />
         </div>
@@ -180,7 +185,8 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
               <span className="label">Response</span>
               <StatusBadge status={res.status} />
               <span className="text-[11px] text-text3">{res.ms}ms</span>
-              <CopyButton value={prettyJson(res.body)} label="Copy" className="ml-auto h-6 !text-[11px]" />
+              <JsonViewerButton value={res.body} title="Response body" className="ml-auto" />
+              <CopyButton value={prettyJson(res.body)} label="Copy" className="h-6 !text-[11px]" />
             </div>
             <pre className="emu-scroll mono max-h-72 overflow-auto bg-surface-sunk p-3 text-[11.5px] leading-relaxed text-text2">{prettyJson(res.body)}</pre>
           </div>

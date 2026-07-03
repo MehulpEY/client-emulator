@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
 import { tryQuery, q, dbAvailable, SCHEMA } from "@/lib/db";
@@ -9,6 +10,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ reachable: false, subscriptions: [] });
   const tool = req.nextUrl.searchParams.get("tool");
   const subs = tool
@@ -18,6 +21,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const body = await req.json().catch(() => ({}));
 

@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { q, tryQuery, dbAvailable, SCHEMA } from "@/lib/db";
 import { getTool } from "@/lib/tools/registry";
@@ -10,6 +11,8 @@ export const dynamic = "force-dynamic";
 
 /** Fire a generator once, immediately (manual "run now"). */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const [gen] = await tryQuery<GeneratorRow>(`select * from ${SCHEMA}.generators where generator_id = $1`, [params.id]);
   if (!gen) return NextResponse.json({ ok: false, error: "not found" }, { status: 404 });

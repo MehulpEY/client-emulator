@@ -52,8 +52,8 @@ export function ToolEvents({ toolId }: { toolId: string }) {
           ))}
           {result && (
             <div className="text-[11.5px] text-text2">
-              Emitted <span className="mono">{result.type}</span> → {result.matched} matched, <span className="text-ok">{result.delivered} delivered</span>.
-              {result.matched === 0 ? <> No subscription yet — <Link href="/events" className="text-accent-fg hover:underline">create one</Link>.</> : null}
+              Emitted <span className="mono">{result.type}</span> {"->"} {result.matched} matched, <span className="text-ok">{result.delivered} delivered</span>.
+              {result.matched === 0 ? <> No subscription yet - <Link href="/events" className="text-accent-fg hover:underline">create one</Link>.</> : null}
             </div>
           )}
         </div>

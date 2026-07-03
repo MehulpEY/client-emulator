@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { Boxes, BookOpen } from "lucide-react";
+import { Boxes } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { DbStatus } from "./DbStatus";
+import { UserMenu } from "./UserMenu";
+import type { SessionUser } from "@/lib/auth/types";
 
-/** Top chrome: mobile brand, live DB status, theme toggle. */
-export function Topbar() {
+/** Top chrome: mobile brand, live DB status, theme toggle, signed-in user menu. */
+export function Topbar({ user }: { user: SessionUser }) {
   return (
     <header className="glass-chrome sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border px-4">
       <Link href="/" className="flex items-center gap-2 lg:hidden">
@@ -17,11 +19,10 @@ export function Topbar() {
         <span className="eyebrow">Tool Emulator Console</span>
       </div>
       <div className="flex items-center gap-2">
-        <a href="https://docs.n8n.io/integrations/" target="_blank" rel="noreferrer" className="btn-ghost hidden sm:inline-flex" title="Integrations reference">
-          <BookOpen size={14} /> Integrations
-        </a>
         <DbStatus />
         <ThemeToggle />
+        <span className="mx-1 hidden h-6 w-px bg-hair sm:block" />
+        <UserMenu user={user} />
       </div>
     </header>
   );

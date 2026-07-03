@@ -14,7 +14,7 @@ export function ToolLogs({ toolId }: { toolId: string }) {
   const load = useCallback(() => {
     return api.logs({ tool: toolId, limit: 12 })
       .then((r) => { setLogs(r.logs); setReachable(r.reachable); })
-      .catch(() => { setLogs([]); setReachable(false); });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
   }, [toolId]);
 
   useEffect(() => {

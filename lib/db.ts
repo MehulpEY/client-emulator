@@ -3,7 +3,7 @@ import { Pool } from "pg";
 /**
  * Postgres access for the emulator (Supabase). Mirrors the ZTPA pattern but adds
  * a small circuit breaker: if a connection fails, we stop hammering the DB for a
- * few seconds so a paused/unreachable Supabase never blocks the mock engine —
+ * few seconds so a paused/unreachable Supabase never blocks the mock engine -
  * the catalog is served from the code registry, and DB-backed data (logs, keys,
  * scenarios) simply degrades to empty until the database is reachable again.
  */
@@ -23,21 +23,43 @@ function pool(): Pool {
     _pool = new Pool({
       connectionString: connectionString(),
       ssl: { rejectUnauthorized: false },
-      max: 3,
+      max: 5,
       // The Supabase pooler's first TLS+auth handshake from a distant network can
       // take ~10s; give it room so a cold start doesn't trip the breaker. Queries
       // schema-qualify their tables, so no search_path/`options` is needed.
       connectionTimeoutMillis: 15000,
-      idleTimeoutMillis: 60000,
+      // Retire idle connections before the session pooler drops them server-side
+      // (a dropped idle connection otherwise surfaces as an intermittent error on
+      // the next reuse). keepAlive keeps live sockets from going idle-stale.
+      idleTimeoutMillis: 30000,
+      keepAlive: true,
     });
     _pool.on("error", () => { /* swallow idle-client errors; breaker handles it */ });
   }
   return _pool;
 }
 
-// ── circuit breaker ──────────────────────────────────────────────────────────
+// -- circuit breaker ----------------------------------------------------------
+// A single transient failure - the Supabase session pooler closing an idle
+// connection, or a momentary timeout - must NOT black out the whole app. So we
+// (a) retry a query once on a connection-level error (which grabs a fresh pooled
+// socket), and (b) only open the breaker after several *consecutive* failures,
+// resetting the streak on any success. This stops one blip from flipping every
+// DB-backed panel to "offline" for the full window.
 let breakerOpenUntil = 0;
-const BREAKER_MS = 10000;
+let consecutiveFailures = 0;
+const BREAKER_MS = 6000;
+const FAILURE_THRESHOLD = 3;
+
+/** A likely-transient connection error where a retry on a fresh socket helps. */
+function isConnectionError(err: any): boolean {
+  const code = String(err?.code ?? "");
+  const msg = String(err?.message ?? "").toLowerCase();
+  return (
+    ["ECONNRESET", "ECONNREFUSED", "ETIMEDOUT", "EPIPE", "ENOTFOUND", "EHOSTUNREACH", "57P01", "08006", "08003"].includes(code) ||
+    /connection terminated|connection closed|connection reset|timeout|terminating connection|server closed|socket hang up|not queryable/.test(msg)
+  );
+}
 
 export function dbConfigured(): boolean {
   return !!process.env.DATABASE_URL && !/\[YOUR-PASSWORD\]/.test(process.env.DATABASE_URL);
@@ -47,20 +69,33 @@ export function dbAvailable(): boolean {
   return dbConfigured() && Date.now() >= breakerOpenUntil;
 }
 
-/** Throws on failure (and trips the breaker). Use `tryQuery` for best-effort. */
+/** Throws on failure (opening the breaker after repeated failures). Use `tryQuery` for best-effort. */
 export async function q<T = any>(text: string, params: any[] = []): Promise<T[]> {
   if (!dbConfigured()) throw new Error("DATABASE_URL not configured");
   if (Date.now() < breakerOpenUntil) throw new Error("db circuit open");
-  try {
-    const res = await pool().query(text, params);
-    return res.rows as T[];
-  } catch (err) {
-    breakerOpenUntil = Date.now() + BREAKER_MS;
-    throw err;
+
+  let lastErr: any;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await pool().query(text, params);
+      consecutiveFailures = 0; // any success clears the streak
+      return res.rows as T[];
+    } catch (err) {
+      lastErr = err;
+      // Retry once on a transient connection error: pg drops the dead socket on
+      // error, so the second attempt is served by a fresh connection.
+      if (attempt === 0 && isConnectionError(err)) continue;
+      break;
+    }
   }
+  if (++consecutiveFailures >= FAILURE_THRESHOLD) {
+    breakerOpenUntil = Date.now() + BREAKER_MS;
+    consecutiveFailures = 0;
+  }
+  throw lastErr;
 }
 
-/** Best-effort query — returns `fallback` (default []) instead of throwing. */
+/** Best-effort query - returns `fallback` (default []) instead of throwing. */
 export async function tryQuery<T = any>(text: string, params: any[] = [], fallback: T[] = []): Promise<T[]> {
   try {
     return await q<T>(text, params);

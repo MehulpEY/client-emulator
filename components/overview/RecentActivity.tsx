@@ -16,7 +16,7 @@ export function RecentActivity() {
     let alive = true;
     const load = () => api.logs({ limit: 8 })
       .then((r) => { if (alive) { setLogs(r.logs); setReachable(r.reachable); } })
-      .catch(() => { if (alive) { setLogs([]); setReachable(false); } });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
     load();
     const id = setInterval(load, 8000);
     return () => { alive = false; clearInterval(id); };

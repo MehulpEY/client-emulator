@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { getTool, TOOLS } from "@/lib/tools/registry";
 import { toolEventTypes } from "@/lib/tools/events";
@@ -5,8 +6,10 @@ import { toolEventTypes } from "@/lib/tools/events";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Event types a tool (or every tool) can publish — feeds the subscribe / emit UI. */
+/** Event types a tool (or every tool) can publish - feeds the subscribe / emit UI. */
 export async function GET(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   const toolId = req.nextUrl.searchParams.get("tool");
   if (toolId) {
     const tool = getTool(toolId);

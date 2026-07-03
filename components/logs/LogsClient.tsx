@@ -4,10 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Search, RotateCw, Trash2, ListTree, Pause, Play } from "lucide-react";
 import { api } from "@/lib/api";
 import type { LogRow } from "@/lib/types";
-import { Panel, SkeletonRows, EmptyState, Spinner } from "@/components/ui";
+import { Panel, SkeletonRows, EmptyState, Spinner, useConfirm } from "@/components/ui";
 import { LogList } from "./LogList";
 
 export function LogsClient({ tools }: { tools: { id: string; name: string }[] }) {
+  const confirm = useConfirm();
   const [tool, setTool] = useState("");
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
@@ -22,7 +23,7 @@ export function LogsClient({ tools }: { tools: { id: string; name: string }[] })
     try {
       const r = await api.logs({ tool: tool || undefined, status: status || undefined, q: qRef.current || undefined, limit: 200 });
       setLogs(r.logs); setReachable(r.reachable);
-    } catch { setLogs([]); setReachable(false); }
+    } catch { /* transient error: keep last state, retry on next poll */ }
   }, [tool, status]);
 
   useEffect(() => { setLogs(null); load(); }, [load]);
@@ -41,7 +42,8 @@ export function LogsClient({ tools }: { tools: { id: string; name: string }[] })
   }, [q]);
 
   async function clear() {
-    if (!confirm(tool ? `Clear the trace for ${tool}?` : "Clear the entire request trace?")) return;
+    const label = tool ? tools.find((t) => t.id === tool)?.name || tool : null;
+    if (!(await confirm({ title: "Clear request trace", message: label ? <>Clear the request trace for <span className="mono text-text">{label}</span>?</> : "Clear the entire request trace? This removes all logged calls.", confirmLabel: "Clear trace", danger: true }))) return;
     setClearing(true);
     try { await api.clearLogs(tool || undefined); await load(); } finally { setClearing(false); }
   }
@@ -63,7 +65,7 @@ export function LogsClient({ tools }: { tools: { id: string; name: string }[] })
       <div className="flex flex-wrap items-center gap-2 border-b border-hair p-3">
         <div className="relative min-w-[200px] flex-1">
           <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text3" />
-          <input className="field !h-8 pl-9" placeholder="Search path / operation / tool…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="field !h-8 pl-9" placeholder="Search path / operation / tool..." value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <select className="field !h-8 w-auto" value={tool} onChange={(e) => setTool(e.target.value)}>
           <option value="">All tools</option>

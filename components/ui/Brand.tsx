@@ -1,7 +1,7 @@
 import { Boxes } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-/** Squared brand mark — the glyph in a flat yellow tile + wordmark. */
+/** Squared brand mark - the glyph in a flat yellow tile + wordmark. */
 export function Brand({ size = "md", showSub = true, className }: { size?: "sm" | "md"; showSub?: boolean; className?: string }) {
   const tile = size === "sm" ? 26 : 30;
   const glyph = Math.round(tile * 0.56);

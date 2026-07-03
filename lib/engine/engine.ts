@@ -24,7 +24,7 @@ export interface EngineOutcome {
   params: Record<string, string>;
   scenario?: string;
   latencyMs: number;
-  /** Set on a successful mutating call → publish this event to subscribers. */
+  /** Set on a successful mutating call -> publish this event to subscribers. */
   emitEvent?: string;
 }
 
@@ -42,11 +42,11 @@ export async function runEngine(input: EngineInput): Promise<EngineOutcome> {
 
   const match = matchEndpoint(tool, method, pathSegments);
 
-  // No path match at all → 404.
+  // No path match at all -> 404.
   if (!match) {
     return { ...base, status: 404, body: errorBody(tool, 404, `No emulated endpoint for ${method} ${"/" + pathSegments.join("/")}`), headers: {}, matched: false, authorized: false };
   }
-  // Path matched but method differs → 405.
+  // Path matched but method differs -> 405.
   if (match.params.__wrongMethod) {
     const { __wrongMethod, ...params } = match.params;
     return { ...base, params, status: 405, body: errorBody(tool, 405, `Method ${method} not allowed on this endpoint`), headers: {}, matched: false, authorized: false };
@@ -108,7 +108,7 @@ export async function runEngine(input: EngineInput): Promise<EngineOutcome> {
     respBody = errorBody(tool, 500, `Emulator handler error: ${err?.message ?? "unknown"}`);
   }
 
-  // A successful, non-GET call is a state change → publish an activity event.
+  // A successful, non-GET call is a state change -> publish an activity event.
   const emitEvent = method !== "GET" && status < 300 ? endpoint.emits || endpoint.operation : undefined;
 
   return {

@@ -2,21 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Boxes, ListTree, KeyRound, Webhook } from "lucide-react";
+import { LayoutDashboard, Boxes, ListTree, KeyRound, Webhook, Users, type LucideIcon } from "lucide-react";
 import { Brand } from "@/components/ui";
-import { cn } from "@/lib/cn";
+import type { Role } from "@/lib/auth/types";
 
-const NAV = [
+type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean };
+
+const BASE_NAV: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/tools", label: "Tool Catalog", icon: Boxes },
   { href: "/events", label: "Subscriptions", icon: Webhook },
   { href: "/logs", label: "Request Trace", icon: ListTree },
-  { href: "/keys", label: "API Keys", icon: KeyRound },
 ];
 
-export function Sidebar() {
+const ADMIN_NAV: NavItem[] = [
+  { href: "/keys", label: "API Keys", icon: KeyRound },
+  { href: "/users", label: "Users", icon: Users },
+];
+
+export function Sidebar({ role }: { role: Role }) {
   const pathname = usePathname();
   const isActive = (href: string, exact?: boolean) => (exact ? pathname === href : pathname === href || pathname.startsWith(href + "/"));
+  const nav = role === "administrator" ? [...BASE_NAV, ...ADMIN_NAV] : BASE_NAV;
 
   return (
     <aside className="glass-chrome hidden w-[232px] shrink-0 flex-col border-r border-border lg:flex">
@@ -25,7 +32,7 @@ export function Sidebar() {
       </div>
       <span className="spectrum-line thin" />
       <nav className="flex-1 space-y-0.5 p-3">
-        {NAV.map((item) => {
+        {nav.map((item) => {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href} className="navitem" data-active={isActive(item.href, item.exact)}>

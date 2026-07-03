@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { dbAvailable } from "@/lib/db";
 import { getTool } from "@/lib/tools/registry";
@@ -7,9 +8,11 @@ import { publishEvent } from "@/lib/engine/events";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** Manually emit an event for a tool — used by the dashboard "Emit test event"
+/** Manually emit an event for a tool - used by the dashboard "Emit test event"
  *  button and any operator-driven simulation. Awaited so the UI sees the result. */
 export async function POST(req: NextRequest) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const body = await req.json().catch(() => ({}));
 

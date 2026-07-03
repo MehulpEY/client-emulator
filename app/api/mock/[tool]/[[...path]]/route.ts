@@ -43,7 +43,7 @@ async function handle(req: NextRequest, ctx: { params: { tool: string; path?: st
 
   const tool = getTool(toolSlug);
 
-  // Unknown tool → 404, still logged so it shows up in the trace.
+  // Unknown tool -> 404, still logged so it shows up in the trace.
   if (!tool) {
     const outcome = {
       status: 404, body: { error: { code: 404, message: `Unknown tool "${toolSlug}"`, emulated: true } },
@@ -53,7 +53,7 @@ async function handle(req: NextRequest, ctx: { params: { tool: string; path?: st
     return NextResponse.json(outcome.body, { status: 404 });
   }
 
-  // Base path with no subpath → a friendly "tool is live" descriptor.
+  // Base path with no subpath -> a friendly "tool is live" descriptor.
   if (pathSegments.length === 0) {
     return NextResponse.json({
       emulated: true,
@@ -68,7 +68,7 @@ async function handle(req: NextRequest, ctx: { params: { tool: string; path?: st
   await logRequest({ toolId: tool.id, toolSlug, method, path: fullPath, query, headers, body, outcome });
 
   // Activity trigger: a successful mutating call publishes to subscribers. Fire-
-  // and-forget — the `next start` event loop drains it without blocking the call.
+  // and-forget - the `next start` event loop drains it without blocking the call.
   if (outcome.emitEvent) {
     void publishEvent({ toolId: tool.id, toolSlug, eventType: outcome.emitEvent, data: outcome.body, source: "activity" }).catch(() => {});
   }

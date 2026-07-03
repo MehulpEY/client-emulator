@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextResponse } from "next/server";
 import { tryQuery, dbAvailable, SCHEMA } from "@/lib/db";
 import { catalogStats } from "@/lib/stats";
@@ -40,6 +41,8 @@ async function dbStats(): Promise<DbStats> {
 }
 
 export async function GET() {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   const [db] = await Promise.all([dbStats()]);
   return NextResponse.json({ catalog: catalogStats(), db });
 }

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Webhook, Trash2, Power } from "lucide-react";
 import { api } from "@/lib/api";
 import type { SubscriptionRow } from "@/lib/types";
-import { Panel, SkeletonRows, EmptyState, Chip, CopyButton } from "@/components/ui";
+import { Panel, SkeletonRows, EmptyState, Chip, CopyButton, useConfirm } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export function SubscriptionList({ tools, refreshKey, onChange }: { tools: { id: string; name: string }[]; refreshKey: number; onChange: () => void }) {
+  const confirm = useConfirm();
   const [subs, setSubs] = useState<SubscriptionRow[] | null>(null);
   const [reachable, setReachable] = useState(true);
   const nameOf = (id: string | null) => (id ? tools.find((t) => t.id === id)?.name || id : "All tools");
@@ -16,14 +17,14 @@ export function SubscriptionList({ tools, refreshKey, onChange }: { tools: { id:
   const load = useCallback(() => {
     return api.subscriptions()
       .then((r) => { setSubs(r.subscriptions); setReachable(r.reachable); })
-      .catch(() => { setSubs([]); setReachable(false); });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
   }, []);
 
   useEffect(() => { load(); }, [load, refreshKey]);
 
   async function toggle(s: SubscriptionRow) { await api.toggleSubscription(s.subscription_id, !s.active); await load(); onChange(); }
   async function remove(s: SubscriptionRow) {
-    if (!confirm("Delete this subscription?")) return;
+    if (!(await confirm({ title: "Delete subscription", message: <>Delete the subscription for <span className="mono text-text">{nameOf(s.tool_id)}</span>? Its webhook will stop receiving events.</>, confirmLabel: "Delete", danger: true }))) return;
     await api.deleteSubscription(s.subscription_id); await load(); onChange();
   }
 
@@ -44,9 +45,9 @@ export function SubscriptionList({ tools, refreshKey, onChange }: { tools: { id:
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="text-[12.5px] font-bold">{nameOf(s.tool_id)}</span>
                   <Chip variant={s.event_type === "*" ? "muted" : "accent"}>{s.event_type === "*" ? "all events" : s.event_type}</Chip>
-                  {s.description ? <span className="text-[11px] text-text3">· {s.description}</span> : null}
+                  {s.description ? <span className="text-[11px] text-text3">| {s.description}</span> : null}
                 </div>
-                <div className="mono mt-0.5 truncate text-[11px] text-text3" title={s.target_url}>→ {s.target_url}</div>
+                <div className="mono mt-0.5 truncate text-[11px] text-text3" title={s.target_url}>{"->"} {s.target_url}</div>
               </div>
               <span className="hidden shrink-0 text-[11px] text-text3 lg:block">{relativeTime(s.created_at)}</span>
               <CopyButton value={s.secret} label="secret" className="h-7 !text-[11px]" />

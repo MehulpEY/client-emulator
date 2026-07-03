@@ -25,13 +25,13 @@ function Row({ log }: { log: LogRow }) {
       {open && (
         <div className="grid gap-3 bg-surface-sunk px-4 py-3 lg:grid-cols-2">
           <div>
-            <div className="label mb-1">Request{log.operation ? ` · ${log.operation}` : ""}</div>
+            <div className="label mb-1">Request{log.operation ? ` | ${log.operation}` : ""}</div>
             <pre className="emu-scroll mono max-h-64 overflow-auto bg-surface p-2.5 text-[11px] leading-relaxed text-text2">
 {prettyJson({ query: log.query, headers: log.request_headers, body: log.request_body })}
             </pre>
           </div>
           <div>
-            <div className="label mb-1">Response · {log.status}</div>
+            <div className="label mb-1">Response | {log.status}</div>
             <pre className="emu-scroll mono max-h-64 overflow-auto bg-surface p-2.5 text-[11px] leading-relaxed text-text2">
 {prettyJson(log.response_body)}
             </pre>

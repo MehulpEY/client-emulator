@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-/** HTTP method pill — colour-coded, monospace, squared. */
+/** HTTP method pill - colour-coded, monospace, squared. */
 const METHOD_TONE: Record<string, string> = {
   GET: "text-info border-info-line bg-info-bg",
   POST: "text-ok border-ok-line bg-ok-bg",
@@ -24,7 +24,7 @@ export function MethodBadge({ method, className }: { method: string; className?:
   );
 }
 
-/** HTTP status pill — green 2xx, amber 4xx, red 5xx. */
+/** HTTP status pill - green 2xx, amber 4xx, red 5xx. */
 export function StatusBadge({ status, className }: { status: number; className?: string }) {
   const tone =
     status >= 500 ? "text-danger border-danger-line bg-danger-bg"

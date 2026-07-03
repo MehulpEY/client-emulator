@@ -1,6 +1,6 @@
 // Synthetic-data helpers for the mock engine. Where it adds realism, generators
 // seed a small PRNG from the request input so the same lookup (e.g. a given file
-// hash) yields a stable verdict across calls — like a real reputation service.
+// hash) yields a stable verdict across calls - like a real reputation service.
 
 export function hashStr(s: string): number {
   let h = 2166136261 >>> 0;
@@ -11,7 +11,7 @@ export function hashStr(s: string): number {
   return h >>> 0;
 }
 
-/** mulberry32 — tiny deterministic PRNG. */
+/** mulberry32 - tiny deterministic PRNG. */
 export function rng(seed: number | string) {
   let a = typeof seed === "string" ? hashStr(seed) : seed >>> 0;
   return function () {

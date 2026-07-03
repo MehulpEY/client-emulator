@@ -1,3 +1,4 @@
+import { requireApiUser } from "@/lib/auth/guard";
 import { NextRequest, NextResponse } from "next/server";
 import { q, dbAvailable, SCHEMA } from "@/lib/db";
 import { reloadScheduler } from "@/lib/engine/scheduler";
@@ -7,6 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   const body = await req.json().catch(() => ({}));
   if (typeof body.active !== "boolean") return NextResponse.json({ ok: false, error: "active (boolean) required" }, { status: 400 });
@@ -21,6 +24,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+  const _auth = await requireApiUser();
+  if ("res" in _auth) return _auth.res;
   if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
   try {
     await q(`delete from ${SCHEMA}.generators where generator_id = $1`, [params.id]);

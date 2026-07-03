@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export interface PanelProps {
-  /** Header title — a string renders as an eyebrow (yellow square + uppercase). */
+  /** Header title - a string renders as an eyebrow (yellow square + uppercase). */
   title?: ReactNode;
   /** Content on the right side of the header. */
   actions?: ReactNode;
@@ -20,7 +20,7 @@ export interface PanelProps {
 }
 
 /**
- * Frosted glass panel with a hairline eyebrow header — the workhorse surface.
+ * Frosted glass panel with a hairline eyebrow header - the workhorse surface.
  * The `.panel` / `.panel-head` / `.eyebrow` classes (globals.css) carry the
  * look so it stays consistent everywhere and adapts to light / dark.
  */

@@ -10,12 +10,12 @@ try {
   const r = await fetch(url, { method: "POST" });
   const body = await r.json();
   if (!r.ok || !body.ok) {
-    console.error("✖ Seed failed:", body.error || r.status);
+    console.error("[x] Seed failed:", body.error || r.status);
     process.exit(1);
   }
-  console.log(`✔ Seeded ${body.tools} tools, ${body.endpoints} endpoints.`);
+  console.log(`[ok] Seeded ${body.tools} tools, ${body.endpoints} endpoints.`);
   if (body.masterKey) console.log(`  Master API key: ${body.masterKey}`);
 } catch (err) {
-  console.error(`✖ Could not reach ${url}. Is the app running? (npm run dev)\n  ${err.message}`);
+  console.error(`[x] Could not reach ${url}. Is the app running? (npm run dev)\n  ${err.message}`);
   process.exit(1);
 }

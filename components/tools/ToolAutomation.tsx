@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Timer, Plus, Power, Trash2, Play, Repeat, Shuffle } from "lucide-react";
 import { api } from "@/lib/api";
 import type { GeneratorRow, EventTypeView } from "@/lib/types";
-import { Panel, SkeletonText, EmptyState, Chip, Spinner } from "@/components/ui";
+import { Panel, SkeletonText, EmptyState, Chip, Spinner, useConfirm } from "@/components/ui";
 import { relativeTime, untilTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 
 export function ToolAutomation({ toolId }: { toolId: string }) {
+  const confirm = useConfirm();
   const [gens, setGens] = useState<GeneratorRow[] | null>(null);
   const [reachable, setReachable] = useState(true);
   const [events, setEvents] = useState<EventTypeView[]>([]);
@@ -25,7 +26,7 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
   const load = useCallback(() => {
     return api.generators(toolId)
       .then((r) => { setGens(r.generators); setReachable(r.reachable); })
-      .catch(() => { setGens([]); setReachable(false); });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
   }, [toolId]);
 
   useEffect(() => {
@@ -54,11 +55,16 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
   }
 
   async function toggle(g: GeneratorRow) { await api.toggleGenerator(g.generator_id, !g.active); await load(); }
-  async function remove(g: GeneratorRow) { if (confirm("Delete this generator?")) { await api.deleteGenerator(g.generator_id); await load(); } }
+  async function remove(g: GeneratorRow) {
+    if (await confirm({ title: "Delete generator", message: <>Delete the generator for <span className="mono text-text">{g.event_type}</span>? It will stop emitting immediately.</>, confirmLabel: "Delete", danger: true })) {
+      await api.deleteGenerator(g.generator_id);
+      await load();
+    }
+  }
   async function runNow(g: GeneratorRow) { await api.runGenerator(g.generator_id); await load(); }
 
   const rate = (g: GeneratorRow) =>
-    g.mode === "random" ? `every ${Math.round((g.min_ms || 0) / 1000)}–${Math.round((g.max_ms || 0) / 1000)}s` : `every ${Math.round((g.interval_ms || 0) / 1000)}s`;
+    g.mode === "random" ? `every ${Math.round((g.min_ms || 0) / 1000)}-${Math.round((g.max_ms || 0) / 1000)}s` : `every ${Math.round((g.interval_ms || 0) / 1000)}s`;
 
   return (
     <Panel title="Automation" icon={<Timer size={14} />}>
@@ -98,10 +104,10 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
         )}
         {error && <div className="border border-danger-line bg-danger-bg px-2.5 py-1.5 text-[11.5px] text-danger">{error}</div>}
         <button className="btn-primary w-full" onClick={create} disabled={busy || !eventType || !reachable}>
-          {busy ? <Spinner label="Creating…" /> : <><Plus size={13} /> Add generator</>}
+          {busy ? <Spinner label="Creating..." /> : <><Plus size={13} /> Add generator</>}
         </button>
         <p className="text-[10.5px] leading-relaxed text-text3">
-          Auto-emits this event on a schedule (→ delivered to matching subscriptions). Configure a subscription to route it to an agent.
+          Auto-emits this event on a schedule (then delivered to matching subscriptions). Configure a subscription to route it to an agent.
         </p>
       </div>
 
@@ -110,7 +116,7 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
         {gens === null ? (
           <SkeletonText lines={2} />
         ) : !reachable ? (
-          <div className="text-[11.5px] text-text3">Database offline — generators are stored in Supabase.</div>
+          <div className="text-[11.5px] text-text3">Database offline - generators are stored in Supabase.</div>
         ) : gens.length === 0 ? (
           <div className="py-2 text-center text-[11.5px] text-text3">No generators yet.</div>
         ) : (
@@ -122,9 +128,9 @@ export function ToolAutomation({ toolId }: { toolId: string }) {
                   <div className="mono truncate text-[12px] font-bold">{g.event_type}</div>
                   <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10.5px] text-text3">
                     <Chip variant="muted">{rate(g)}</Chip>
-                    <span>· {g.run_count} fired</span>
-                    {g.active ? <span>· next {untilTime(g.next_run_at)}</span> : <span>· paused</span>}
-                    {g.last_run_at ? <span>· last {relativeTime(g.last_run_at)}</span> : null}
+                    <span>| {g.run_count} fired</span>
+                    {g.active ? <span>| next {untilTime(g.next_run_at)}</span> : <span>| paused</span>}
+                    {g.last_run_at ? <span>| last {relativeTime(g.last_run_at)}</span> : null}
                   </div>
                 </div>
                 <button onClick={() => runNow(g)} className="btn-ghost h-7 w-7 !px-0" title="Run now"><Play size={12} /></button>

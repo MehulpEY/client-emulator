@@ -57,7 +57,7 @@ export interface HealthResponse {
   baseUrl: string;
 }
 
-// ── pub/sub ───────────────────────────────────────────────────────────────
+// -- pub/sub ---------------------------------------------------------------
 export interface SubscriptionRow {
   subscription_id: string;
   tool_id: string | null;
@@ -111,7 +111,7 @@ export interface PublishResult {
   deliveries: { delivery_id: string; subscription_id: string; target_url: string; status: string; response_status: number | null; attempts: number; error: string | null }[];
 }
 
-// ── persisted state (resource store) ───────────────────────────────────────
+// -- persisted state (resource store) ---------------------------------------
 export interface StoredResource {
   resource_id: string;
   data: any;

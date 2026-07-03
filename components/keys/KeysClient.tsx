@@ -19,7 +19,7 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
   function load() {
     return api.keys()
       .then((r) => { setKeys(r.keys); setReachable(r.reachable); })
-      .catch(() => { setKeys([]); setReachable(false); });
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
   }
   useEffect(() => { load(); }, []);
 
@@ -50,7 +50,7 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
                   <div className="flex items-center gap-1.5">
                     <span className="text-[12.5px] font-bold">{nameOf(k.tool_id)}</span>
                     {k.tool_id === null ? <Chip variant="accent">master</Chip> : null}
-                    <span className="text-[11px] text-text3">· {k.label}</span>
+                    <span className="text-[11px] text-text3">| {k.label}</span>
                   </div>
                   <div className="mono mt-0.5 truncate text-[11px] text-text3">{k.secret}</div>
                 </div>
@@ -67,7 +67,7 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
           <label className="block">
             <span className="label mb-1.5 block">Scope</span>
             <select className="field" value={toolId} onChange={(e) => setToolId(e.target.value)} disabled={!reachable}>
-              <option value="">Master — all tools</option>
+              <option value="">Master - all tools</option>
               {tools.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </label>
@@ -76,7 +76,7 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
             <input className="field" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. soc-agent" disabled={!reachable} />
           </label>
           <button className="btn-primary w-full" onClick={create} disabled={creating || !reachable}>
-            {creating ? <Spinner label="Creating…" /> : <><Plus size={14} /> Create key</>}
+            {creating ? <Spinner label="Creating..." /> : <><Plus size={14} /> Create key</>}
           </button>
           <p className="text-[11.5px] leading-relaxed text-text3">
             Once any key exists for a tool (or a master key exists), that tool&apos;s endpoints require a valid key. With none, endpoints stay open for quick testing.

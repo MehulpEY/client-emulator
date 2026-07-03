@@ -48,6 +48,27 @@ export interface MockResult {
   headers?: Record<string, string>;
 }
 
+/** A documented input parameter for an endpoint (Swagger-like reference). */
+export interface EndpointParam {
+  /** Field name; use dot paths for nested body fields, e.g. "incident_keys[].incident_id". */
+  name: string;
+  /** Where it goes on the wire. */
+  in: "path" | "query" | "header" | "body";
+  /** JSON type: "string" | "integer" | "number" | "boolean" | "array" | "object". */
+  type?: string;
+  required?: boolean;
+  /** Short description of what the field does. */
+  description?: string;
+  /** Closed set of accepted values, when the field is an enum. */
+  enum?: string[];
+  /** Human format hint when it's not an enum, e.g. "dd/MM/yyyy HH:mm:ss", "sha256 hash". */
+  format?: string;
+  /** A representative example value. */
+  example?: string | number | boolean;
+  /** Value the API assumes when the field is omitted. */
+  default?: string | number | boolean;
+}
+
 export interface ToolEndpoint {
   method: HttpMethod;
   /** Path relative to the tool base, with `{param}` placeholders. */
@@ -59,7 +80,13 @@ export interface ToolEndpoint {
   aiTool?: boolean;
   /** Example request (body or params) shown in the docs/try-it console. */
   request?: any;
-  /** Static example response — used when `respond` is absent. */
+  /**
+   * Authored parameter reference (accepted values, required, descriptions).
+   * When present the docs modal renders this instead of auto-deriving from
+   * `request`, so enums / allowed values are documented explicitly.
+   */
+  params?: EndpointParam[];
+  /** Static example response - used when `respond` is absent. */
   responseExample?: any;
   /** Dynamic response generator (flagship fidelity). Wins over responseExample. */
   respond?: (ctx: MockContext) => MockResult | Promise<MockResult>;
@@ -81,8 +108,8 @@ export interface ToolEvent {
   /**
    * If set, firing this event persists its payload as a durable resource in the
    * tool's `collection` (keyed by `idOf(data)`), so the tool's GET endpoints can
-   * return it. Persistence happens on every emit — generator, manual, or
-   * activity — regardless of whether any subscription matches.
+   * return it. Persistence happens on every emit - generator, manual, or
+   * activity - regardless of whether any subscription matches.
    */
   persist?: { collection: string; idOf: (data: any) => string };
 }

@@ -131,7 +131,7 @@ async function persistEvent(input: PublishInput): Promise<void> {
     if (!ev?.persist) return;
     const id = ev.persist.idOf(input.data);
     if (id != null && String(id) !== "") await putResource(input.toolId, ev.persist.collection, String(id), input.data);
-  } catch { /* best effort — never block delivery on persistence */ }
+  } catch { /* best effort - never block delivery on persistence */ }
 }
 
 export async function publishEvent(input: PublishInput): Promise<PublishResult> {
