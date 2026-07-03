@@ -1,4 +1,4 @@
-import { tryQuery, dbAvailable, SCHEMA } from "../db";
+import { tryQuery, dbAvailable, SCHEMA, isServerless } from "../db";
 import { getTool } from "../tools/registry";
 import { buildEventPayload } from "../tools/events";
 import { publishEvent } from "./events";
@@ -89,6 +89,11 @@ function tick(): void {
 
 /** Idempotent. Starts the 1s tick + initial load. Safe to call from anywhere. */
 export function startScheduler(): void {
+  // On serverless (Vercel) every warm instance would start its own timer and
+  // fire the same generators, so events arrive duplicated (and only while an
+  // instance is warm). Skip it there and rely on /api/cron/tick instead, which
+  // is DB-driven (coordinated via next_run_at) and fires each generator once.
+  if (isServerless()) return;
   if (state.timer) return;
   state.timer = setInterval(tick, 1000);
   if (typeof (state.timer as any).unref === "function") (state.timer as any).unref();
