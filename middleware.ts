@@ -13,6 +13,7 @@ function isPublic(pathname: string): boolean {
   if (pathname.startsWith("/api/auth/")) return true; // login / setup / accept-invite / logout
   if (pathname.startsWith("/api/mock/")) return true; // agents authenticate with per-tool API keys
   if (pathname.startsWith("/api/consumer/")) return true; // inbound webhook receiver (server-to-server delivery)
+  if (pathname.startsWith("/api/cron/")) return true; // scheduler trigger (protected by CRON_SECRET)
   return PUBLIC_PAGES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 }
 

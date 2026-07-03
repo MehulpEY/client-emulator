@@ -94,3 +94,49 @@ export function startScheduler(): void {
   if (typeof (state.timer as any).unref === "function") (state.timer as any).unref();
   void reloadScheduler();
 }
+
+interface GenRow {
+  generator_id: string;
+  tool_id: string;
+  event_type: string;
+  mode: "fixed" | "random";
+  interval_ms: number | null;
+  min_ms: number | null;
+  max_ms: number | null;
+  payload_override: any;
+  next_run_at: string | null;
+}
+
+/**
+ * Stateless, DB-driven tick for serverless / cron. Fires every active generator
+ * whose `next_run_at` is due (or unset), then advances its schedule in the DB.
+ * Unlike the in-process scheduler it keeps NO memory between calls, so it is safe
+ * to invoke from a cron endpoint on Vercel (where the in-process 1s timer can't
+ * run). Effective resolution is bounded by how often the cron fires it.
+ */
+export async function runDueGenerators(): Promise<{ checked: number; fired: number }> {
+  if (!dbAvailable()) return { checked: 0, fired: 0 };
+  const rows = await tryQuery<GenRow>(
+    `select generator_id, tool_id, event_type, mode, interval_ms, min_ms, max_ms, payload_override, next_run_at
+       from ${SCHEMA}.generators where active = true`,
+  );
+  const now = Date.now();
+  let fired = 0;
+  for (const g of rows) {
+    const due = !g.next_run_at || new Date(g.next_run_at).getTime() <= now;
+    if (!due) continue;
+    const tool = getTool(g.tool_id);
+    if (!tool) continue;
+    try {
+      const data = g.payload_override ?? buildEventPayload(tool, g.event_type);
+      await publishEvent({ toolId: tool.id, toolSlug: tool.id, eventType: g.event_type, data, source: "simulator" });
+    } catch { /* swallow - best effort */ }
+    const next = new Date(now + delayFor(g)).toISOString();
+    await tryQuery(
+      `update ${SCHEMA}.generators set run_count = run_count + 1, last_run_at = now(), next_run_at = $2 where generator_id = $1`,
+      [g.generator_id, next],
+    );
+    fired++;
+  }
+  return { checked: rows.length, fired };
+}
