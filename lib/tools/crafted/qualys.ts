@@ -1,8 +1,12 @@
 import type { ToolDef, MockContext, MockResult } from "../types";
 import { rng, int, pick, sample, fakeIp, HOSTNAMES, USERS, daysAgoIso, uuid, type RNG } from "../helpers";
+import { fleetEndpoints, macColon, type FleetDevice } from "../../fleet/fleet";
 
 // Qualys - vulnerability management. The real VM API is XML; for agent ergonomics
 // the emulator returns JSON with recognizable Qualys QID/severity semantics.
+// The host inventory and per-host detections project from the canonical fleet
+// (lib/fleet/fleet.ts, PLAN §4.4) so DNS/serial/MAC line up with CrowdStrike,
+// Trellix and the rest of the adapters - deterministic per fleetId.
 
 const VULNS = [
   { qid: 38170, title: "SSL Certificate - Signature Verification Failed", cve: "CVE-2016-2107", severity: 3 },
@@ -36,6 +40,66 @@ function detectionForHost(host: string) {
     })),
   };
 }
+
+// --- fleet projections (host inventory + detections, PLAN §4.4) --------------
+
+/** Stable numeric Qualys host asset ID for a fleet device. */
+const qualysHostId = (fleetId: string): number => int(rng("qualys:hostid:" + fleetId), 100000, 999999);
+
+/** Parse a truncation_limit query value (default 1000; 0 disables truncation). */
+function truncationLimit(raw: string | undefined): number {
+  const n = Number(raw ?? "1000");
+  return Number.isFinite(n) && n >= 0 ? n : 1000;
+}
+
+/** Project a fleet endpoint into a HOST_LIST_OUTPUT host record. */
+function fleetHost(d: FleetDevice) {
+  const r = rng("qualys:fleethost:" + d.fleetId);
+  return {
+    ID: qualysHostId(d.fleetId),
+    IP: d.ip,
+    DNS: d.hostname,
+    NETBIOS: d.hostname.toUpperCase(),
+    OS: d.os,
+    LAST_VULN_SCAN_DATETIME: daysAgoIso(int(r, 0, 14)),
+    SERIAL_NUMBER: d.serial,
+    MAC_ADDRESS: macColon(d.mac),
+  };
+}
+
+/** Deterministic VM detections for a fleet endpoint (0-4, from the QID catalog). */
+function fleetDetections(d: FleetDevice) {
+  const r = rng("qualys:fleetdet:" + d.fleetId);
+  const vulns = sample(r, VULNS, int(r, 0, 4));
+  return vulns.map((v) => ({
+    QID: v.qid,
+    TYPE: "Confirmed",
+    SEVERITY: v.severity,
+    TITLE: v.title,
+    CVE: v.cve,
+    STATUS: pick(r, ["Active", "Active", "Active", "Fixed"] as const),
+    FIRST_FOUND_DATETIME: daysAgoIso(int(r, 14, 200)),
+    LAST_FOUND_DATETIME: daysAgoIso(int(r, 0, 14)),
+    TIMES_FOUND: int(r, 1, 30),
+    IS_PATCHABLE: 1,
+  }));
+}
+
+/** Project a fleet endpoint into a VM-detection host row (detections attached). */
+function fleetDetectionHost(d: FleetDevice) {
+  const r = rng("qualys:fleetdethost:" + d.fleetId);
+  return {
+    ID: qualysHostId(d.fleetId),
+    IP: d.ip,
+    DNS: d.hostname,
+    OS: d.os,
+    LAST_SCAN_DATETIME: daysAgoIso(int(r, 0, 14)),
+    DETECTION_LIST: fleetDetections(d),
+  };
+}
+
+/** Comma-separated query value -> trimmed non-empty tokens. */
+const csv = (raw: string | undefined): string[] => (raw || "").split(",").map((s) => s.trim()).filter(Boolean);
 
 // --- Additional Qualys VM API record builders (deterministic, seeded) ---------
 
@@ -182,15 +246,23 @@ export const qualys: ToolDef = {
         { name: "Authorization", in: "header", type: "string", required: true, format: "HTTP Basic auth (base64 user:pass)", description: "Qualys account credentials." },
       ],
       respond: (ctx: MockContext): MockResult => {
-        const r = rng("qualys:det:" + (ctx.query.ids || ""));
-        const n = int(r, 2, 5);
+        const idFilter = csv(ctx.query.ids);
+        const sevFilter = csv(ctx.query.severities).map(Number);
+        const statusFilter = csv(ctx.query.status);
+        let hosts = fleetEndpoints().map(fleetDetectionHost);
+        if (idFilter.length) hosts = hosts.filter((h) => idFilter.includes(String(h.ID)));
+        if (sevFilter.length) hosts = hosts.map((h) => ({ ...h, DETECTION_LIST: h.DETECTION_LIST.filter((det) => sevFilter.includes(det.SEVERITY)) }));
+        if (statusFilter.length) hosts = hosts.map((h) => ({ ...h, DETECTION_LIST: h.DETECTION_LIST.filter((det) => statusFilter.includes(det.STATUS)) }));
+        if (sevFilter.length || statusFilter.length) hosts = hosts.filter((h) => h.DETECTION_LIST.length > 0);
+        const limit = truncationLimit(ctx.query.truncation_limit);
+        if (limit > 0) hosts = hosts.slice(0, limit);
         return {
           status: 200,
           body: {
             HOST_LIST_VM_DETECTION_OUTPUT: {
               RESPONSE: {
                 DATETIME: daysAgoIso(0),
-                HOST_LIST: { HOST: Array.from({ length: n }).map(() => detectionForHost(uuid())) },
+                HOST_LIST: { HOST: hosts },
               },
             },
           },
@@ -241,23 +313,18 @@ export const qualys: ToolDef = {
         { name: "truncation_limit", in: "query", type: "integer", example: 1000, default: 1000, description: "Max host records returned; 0 disables truncation." },
         { name: "Authorization", in: "header", type: "string", required: true, format: "HTTP Basic auth (base64 user:pass)", description: "Qualys account credentials." },
       ],
-      respond: (): MockResult => {
-        const r = rng("qualys:hosts:" + uuid());
-        const n = int(r, 3, 8);
+      respond: (ctx: MockContext): MockResult => {
+        const idFilter = csv(ctx.query.ids);
+        let hosts = fleetEndpoints().map(fleetHost);
+        if (idFilter.length) hosts = hosts.filter((h) => idFilter.includes(String(h.ID)));
+        const limit = truncationLimit(ctx.query.truncation_limit);
+        if (limit > 0) hosts = hosts.slice(0, limit);
         return {
           status: 200,
           body: {
             HOST_LIST_OUTPUT: {
               RESPONSE: {
-                HOST_LIST: {
-                  HOST: Array.from({ length: n }).map(() => ({
-                    ID: int(r, 100000, 999999),
-                    IP: fakeIp(r),
-                    DNS: pick(r, HOSTNAMES).toLowerCase() + ".corp.local",
-                    OS: pick(r, ["Windows 2019", "RHEL 8", "Ubuntu 20.04"]),
-                    LAST_VULN_SCAN_DATETIME: daysAgoIso(int(r, 0, 21)),
-                  })),
-                },
+                HOST_LIST: { HOST: hosts },
               },
             },
           },
