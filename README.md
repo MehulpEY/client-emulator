@@ -72,7 +72,7 @@ npm run build && npm run start   # or: npm run dev   (port 3002)
 npm run db:seed             # mirror the catalog into Supabase + mint a master key
 ```
 
-Open **http://localhost:3002**. First run: visit `/setup` to create the administrator account (the dashboard and its APIs require a signed-in user; `/api/mock/*`, `/api/gateway/*`, `/api/consumer/*` and `/api/cron/*` are public surfaces).
+Open **http://localhost:3002** — unauthenticated visitors land on the public landing page (every number on it is derived from the code registry at request time). First run: visit `/setup` to create the administrator account (the dashboard and its APIs require a signed-in user; `/api/mock/*`, `/api/gateway/*`, `/api/consumer/*` and `/api/cron/*` are public surfaces). Onboarding is invitation-only (Resend email or a manually shared link), and active users can self-serve password resets via **/forgot-password** (single-use, 1-hour emailed link — requires `RESEND_API_KEY`/`EMAIL_FROM`).
 
 Environment variables are unchanged from the pre-adapter era — see `.env.example` (`DATABASE_URL`, `DB_SCHEMA`, `NEXT_PUBLIC_EMULATOR_BASE_URL`, `AUTH_SECRET`, `RESEND_API_KEY`/`EMAIL_FROM`, `CRON_SECRET`).
 

@@ -46,7 +46,7 @@ export function AcceptInviteForm({ token, valid, email, name, role }: { token: s
         setBusy(false);
         return;
       }
-      router.push("/");
+      router.push("/overview");
       router.refresh();
     } catch {
       setError("Network error - please try again.");

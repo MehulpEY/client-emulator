@@ -7,10 +7,11 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 // again server-side in each route handler / layout (against the DB), so a
 // bypass here alone can't grant access - defense in depth.
 
-const PUBLIC_PAGES = ["/login", "/setup", "/accept-invite"];
+const PUBLIC_PAGES = ["/login", "/setup", "/accept-invite", "/forgot-password", "/reset-password"];
 
 function isPublic(pathname: string): boolean {
-  if (pathname.startsWith("/api/auth/")) return true; // login / setup / accept-invite / logout
+  if (pathname === "/") return true; // public landing (authed visitors are bounced to /overview by the page)
+  if (pathname.startsWith("/api/auth/")) return true; // login / setup / accept-invite / forgot / reset / logout
   if (pathname.startsWith("/api/mock/")) return true; // agents authenticate with per-tool API keys
   if (pathname.startsWith("/api/gateway/")) return true; // singular endpoint: the connection embodies the credential
   if (pathname.startsWith("/api/consumer/")) return true; // inbound webhook receiver (server-to-server delivery)
@@ -47,7 +48,7 @@ export async function middleware(req: NextRequest) {
   if (isAdminOnly(pathname) && user.role !== "administrator") {
     if (isApi(pathname)) return NextResponse.json({ ok: false, error: "administrator role required" }, { status: 403 });
     const url = req.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/overview";
     url.search = "";
     return NextResponse.redirect(url);
   }

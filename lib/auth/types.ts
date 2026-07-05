@@ -14,6 +14,8 @@ export interface UserRow {
   status: UserStatus;
   invite_token_hash: string | null;
   invite_expires_at: string | null;
+  reset_token_hash: string | null;
+  reset_expires_at: string | null;
   created_by: string | null;
   created_at: string;
   onboarded_at: string | null;

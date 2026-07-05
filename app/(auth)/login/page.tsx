@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  if (await getCurrentUser()) redirect("/");
+  if (await getCurrentUser()) redirect("/overview");
   if ((await countUsers()) === 0) redirect("/setup");
   return <LoginForm />;
 }

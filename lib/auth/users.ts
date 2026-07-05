@@ -5,7 +5,7 @@ import { q, tryQuery, SCHEMA } from "../db";
 import type { UserRow, Role, UserStatus, PublicUser } from "./types";
 
 const COLS =
-  "user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, created_by, created_at, onboarded_at, last_login_at";
+  "user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, reset_token_hash, reset_expires_at, created_by, created_at, onboarded_at, last_login_at";
 
 export function newUserId(): string {
   return `usr_${randomBytes(9).toString("hex")}`;
@@ -50,6 +50,29 @@ export async function getUserById(id: string): Promise<UserRow | null> {
 export async function getUserByInviteHash(hash: string): Promise<UserRow | null> {
   const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where invite_token_hash = $1 limit 1`, [hash]);
   return rows[0] ?? null;
+}
+
+export async function getUserByResetHash(hash: string): Promise<UserRow | null> {
+  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where reset_token_hash = $1 limit 1`, [hash]);
+  return rows[0] ?? null;
+}
+
+/** Store a fresh password-reset token hash + expiry (self-service forgot flow). */
+export async function setResetToken(userId: string, resetHash: string, expiresAt: string): Promise<void> {
+  await q(
+    `update ${SCHEMA}.users set reset_token_hash = $2, reset_expires_at = $3 where user_id = $1`,
+    [userId, resetHash, expiresAt],
+  );
+}
+
+/** Complete a password reset: set the new password and burn the token. */
+export async function resetPassword(userId: string, passwordHash: string): Promise<void> {
+  await q(
+    `update ${SCHEMA}.users
+        set password_hash = $2, reset_token_hash = null, reset_expires_at = null
+      where user_id = $1`,
+    [userId, passwordHash],
+  );
 }
 
 export async function listUsers(): Promise<UserRow[]> {

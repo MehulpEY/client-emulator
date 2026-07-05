@@ -217,6 +217,11 @@ CREATE TABLE IF NOT EXISTS users (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_uidx ON users (lower(email));
 
+-- Self-service password reset: the emailed token is stored only as a sha256
+-- hash, single-use, short-lived (1 hour). Additive + idempotent for existing DBs.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
+
 -- ============================================================================
 -- ADAPTER PLATFORM (docs/adapter-platform/PLAN.md §4) ------------------------
 -- ============================================================================
