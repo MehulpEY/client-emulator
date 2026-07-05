@@ -36,9 +36,50 @@ export interface DbStats {
   topTools: { tool_id: string; count: number }[];
 }
 
+// -- adapter platform rollups (PLAN §6 W9) -----------------------------------
+
+/** Connection counts per lifecycle state (lib/adapters/types.ts ConnectionStatus). */
+export interface ConnectionsByStatus {
+  connected: number;
+  degraded: number;
+  error: number;
+  pending: number;
+  connecting: number;
+  disabled: number;
+}
+
+/** One row of the overview "discovery activity" feed: recent fetch runs merged
+ *  with connection status transitions, newest first. */
+export interface DiscoveryActivityItem {
+  kind: "fetch" | "status";
+  at: string;
+  toolId: string;
+  /** Connection label (falls back to the connection id when it was deleted). */
+  label: string;
+  detail: string;
+  ok: boolean;
+  /** Dot tone for the feed (ok/warn/danger per PLAN §4.7 status colors). */
+  tone: "ok" | "warn" | "danger" | "info" | "muted";
+}
+
+/** The `adapters` block of GET /api/stats. All DB-backed counts degrade to
+ *  zeros when the database is offline (`db.reachable` tells the UI which). */
+export interface AdapterPlatformStats {
+  /** Catalog size from the adapter metadata registry (lib/adapters/meta.ts). */
+  adapters: number;
+  connections: { total: number; byStatus: ConnectionsByStatus };
+  /** Correlated inventory; byType keys are asset types (device, user, ...). */
+  assets: { total: number; byType: Record<string, number> };
+  /** Discovery runs in the trailing 24h window. */
+  fetches24h: { runs: number; records: number; failures: number };
+  lastDiscoveryAt: string | null;
+  recentActivity: DiscoveryActivityItem[];
+}
+
 export interface StatsResponse {
   catalog: CatalogStats;
   db: DbStats;
+  adapters: AdapterPlatformStats;
 }
 
 export interface ApiKeyRow {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Boxes, ListTree, KeyRound, Webhook, Users, Timer, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, Boxes, Layers, ListTree, KeyRound, Webhook, Users, Timer, type LucideIcon } from "lucide-react";
 import { Brand } from "@/components/ui";
 import type { Role } from "@/lib/auth/types";
 
@@ -11,6 +11,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean 
 const BASE_NAV: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/adapters", label: "Adapters", icon: Boxes },
+  { href: "/assets", label: "Assets", icon: Layers },
   { href: "/events", label: "Subscriptions", icon: Webhook },
   { href: "/generators", label: "Automation", icon: Timer },
   { href: "/logs", label: "Request Trace", icon: ListTree },
