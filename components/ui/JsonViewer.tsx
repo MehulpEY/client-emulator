@@ -51,7 +51,7 @@ export function JsonViewer({ open, onClose, value, title = "JSON viewer" }: Json
       icon={<Braces size={14} />}
       title={
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-bold">{title}</span>
+          <span className="text-[14px] font-semibold">{title}</span>
           {ok ? (
             <span className="chip !text-ok"><Check size={11} /> Valid</span>
           ) : (
@@ -72,14 +72,14 @@ export function JsonViewer({ open, onClose, value, title = "JSON viewer" }: Json
       }
     >
       {!ok && error ? (
-        <div className="mb-3 flex items-start gap-2 border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">
+        <div className="mb-3 flex items-start gap-2 rounded border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       ) : null}
       <pre
         className={cn(
-          "emu-scroll mono max-h-[62vh] overflow-auto bg-surface-sunk p-3 text-[12px] leading-relaxed",
+          "emu-scroll mono max-h-[62vh] overflow-auto rounded bg-surface-sunk p-3 text-[12px] leading-relaxed",
           ok ? "text-text2" : "text-text3",
           wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre",
         )}
@@ -95,7 +95,7 @@ export function JsonViewerButton({ value, title, label = "View", className }: { 
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className={cn("btn-ghost h-6 !text-[11px]", className)} onClick={() => setOpen(true)} title="Open JSON viewer">
+      <button type="button" className={cn("btn-ghost h-7 !px-2", className)} onClick={() => setOpen(true)} title="Open JSON viewer">
         <Braces size={12} /> {label}
       </button>
       <JsonViewer open={open} onClose={() => setOpen(false)} value={value} title={title} />

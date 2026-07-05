@@ -31,7 +31,7 @@ export function Sidebar({ role }: { role: Role }) {
       <div className="flex h-14 items-center px-4">
         <Link href="/"><Brand /></Link>
       </div>
-      <span className="spectrum-line thin" />
+      <span className="accent-line" />
       <nav className="flex-1 space-y-0.5 p-3">
         {nav.map((item) => {
           const Icon = item.icon;
@@ -43,8 +43,8 @@ export function Sidebar({ role }: { role: Role }) {
           );
         })}
       </nav>
-      <div className="border-t border-hair p-3 text-[10.5px] leading-relaxed text-text3">
-        <div className="font-bold uppercase tracking-[0.1em] text-text2">Client Emulator</div>
+      <div className="border-t border-hair p-3 text-[11px] leading-relaxed text-text3">
+        <div className="font-semibold text-text2">Client Emulator</div>
         <div className="mt-0.5">Mock tool sandbox for agent simulation.</div>
       </div>
     </aside>

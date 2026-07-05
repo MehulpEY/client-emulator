@@ -12,7 +12,7 @@ export function Spinner({ label, className }: { label?: ReactNode; className?: s
   );
 }
 
-/** Plain uppercase section label (no leading square). */
+/** Plain sentence-case section label (no leading square). */
 export function SectionLabel({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={cn("label mb-3", className)}>{children}</div>;
 }
@@ -22,17 +22,18 @@ export function Eyebrow({ children, accent = false, className }: { children: Rea
   return <span className={cn("eyebrow", accent && "accent", className)}>{children}</span>;
 }
 
-/** Thin spectrum keyline (decorative rule). */
-export function SpectrumLine({ thin = false, warm = false, className }: { thin?: boolean; warm?: boolean; className?: string }) {
-  return <span aria-hidden className={cn("spectrum-line", thin && "thin", warm && "warm", className)} />;
+/** Thin accent keyline (decorative rule). The `thin`/`warm` props are kept for
+ *  API compatibility - the calm system renders a single 2px accent rule. */
+export function SpectrumLine({ className }: { thin?: boolean; warm?: boolean; className?: string }) {
+  return <span aria-hidden className={cn("accent-line", className)} />;
 }
 
 export function EmptyState({ icon: Icon, title, sub, action }: { icon: LucideIcon; title: string; sub?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center gap-2 p-10 text-center text-text3">
       <Icon size={26} />
-      <div className="text-[13px] font-bold text-text2">{title}</div>
-      {sub && <div className="max-w-md text-[11.5px]">{sub}</div>}
+      <div className="text-[13px] font-semibold text-text2">{title}</div>
+      {sub && <div className="max-w-md text-[12px]">{sub}</div>}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );

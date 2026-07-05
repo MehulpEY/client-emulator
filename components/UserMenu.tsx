@@ -25,10 +25,10 @@ export function UserMenu({ user }: { user: SessionUser }) {
   return (
     <div className="flex items-center gap-2">
       <div className="hidden leading-tight sm:block">
-        <div className="max-w-[150px] truncate text-[12px] font-bold">{user.name || user.email}</div>
-        <div className="text-[10px] uppercase tracking-[0.1em] text-text3">{admin ? "Administrator" : "Consumer"}</div>
+        <div className="max-w-[150px] truncate text-[12px] font-semibold">{user.name || user.email}</div>
+        <div className="text-[11px] text-text3">{admin ? "Administrator" : "Consumer"}</div>
       </div>
-      <span className="grid h-8 w-8 place-items-center bg-surface-sunk text-accent-fg" title={user.email}>
+      <span className="grid h-8 w-8 place-items-center rounded bg-surface-sunk text-accent-fg" title={user.email}>
         {admin ? <ShieldCheck size={15} /> : <UserRound size={15} />}
       </span>
       <button onClick={logout} disabled={busy} className="btn-ghost h-8 w-8 !px-0" title="Sign out" aria-label="Sign out">

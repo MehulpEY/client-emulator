@@ -11,8 +11,8 @@ export function Brand({ size = "md", showSub = true, className }: { size?: "sm" 
         <Boxes size={glyph} className="text-accent-ink" />
       </span>
       <div className="leading-[1.15]">
-        <div className={cn("font-bold tracking-[-0.01em]", size === "sm" ? "text-[13px]" : "text-[14px]")}>Client Emulator</div>
-        {showSub && <div className="text-[10px] uppercase tracking-[0.14em] text-text3">Tool Sandbox</div>}
+        <div className={cn("font-semibold tracking-[-0.01em]", size === "sm" ? "text-[13px]" : "text-[14px]")}>Client Emulator</div>
+        {showSub && <div className="text-[10.5px] tracking-[0.04em] text-text3">Tool Sandbox</div>}
       </div>
     </div>
   );

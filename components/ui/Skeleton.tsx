@@ -22,7 +22,7 @@ export function SkeletonCards({ count = 8 }: { count?: number }) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 3xl:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="panel space-y-3 p-4">
+        <div key={i} className="panel space-y-3 p-5">
           <div className="flex items-center gap-3">
             <Skeleton className="h-9 w-9 shrink-0" />
             <div className="min-w-0 flex-1 space-y-2">
@@ -60,7 +60,7 @@ export function SkeletonRows({ rows = 6 }: { rows?: number }) {
 /** A panel placeholder with a header line and body text. */
 export function SkeletonPanel({ className = "", lines = 4 }: { className?: string; lines?: number }) {
   return (
-    <div className={cn("panel space-y-3 p-4", className)}>
+    <div className={cn("panel space-y-3 p-5", className)}>
       <Skeleton className="h-4 w-40" />
       <SkeletonText lines={lines} />
     </div>
@@ -72,7 +72,7 @@ export function SkeletonStats({ count = 4 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="panel space-y-3 p-4">
+        <div key={i} className="panel space-y-3 p-5">
           <Skeleton className="h-3 w-20" />
           <Skeleton className="h-7 w-16" />
         </div>

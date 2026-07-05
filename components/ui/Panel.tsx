@@ -35,7 +35,7 @@ export function Panel({
             {icon ? <span className="shrink-0 text-accent-fg">{icon}</span> : null}
             {typeof title === "string" ? (
               plainTitle ? (
-                <h2 className="truncate text-[13px] font-bold">{title}</h2>
+                <h2 className="truncate text-[14px] font-semibold">{title}</h2>
               ) : (
                 <h2 className="eyebrow truncate">{title}</h2>
               )
@@ -46,7 +46,7 @@ export function Panel({
           {actions ? <div className="flex shrink-0 items-center gap-1.5">{actions}</div> : null}
         </header>
       )}
-      <div className={cn("min-h-0 flex-1", !noPadding && "p-4", bodyClassName)}>{children}</div>
+      <div className={cn("min-h-0 flex-1", !noPadding && "p-5", bodyClassName)}>{children}</div>
     </section>
   );
 }

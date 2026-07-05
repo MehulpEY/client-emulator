@@ -21,7 +21,7 @@ const VARIANTS: Record<ChipVariant, string> = {
   muted: "text-text3",
 };
 
-/** Squared hairline tag. Variants carry meaning via state colour. */
+/** Soft-radius hairline tag. Variants carry meaning via state colour. */
 export function Chip({ children, variant = "default", icon, className, title }: ChipProps) {
   return (
     <span className={cn("chip", VARIANTS[variant], className)} title={title}>
