@@ -10,7 +10,7 @@ type NavItem = { href: string; label: string; icon: LucideIcon; exact?: boolean 
 
 const BASE_NAV: NavItem[] = [
   { href: "/", label: "Overview", icon: LayoutDashboard, exact: true },
-  { href: "/tools", label: "Tool Catalog", icon: Boxes },
+  { href: "/adapters", label: "Adapters", icon: Boxes },
   { href: "/events", label: "Subscriptions", icon: Webhook },
   { href: "/generators", label: "Automation", icon: Timer },
   { href: "/logs", label: "Request Trace", icon: ListTree },
