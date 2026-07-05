@@ -1,7 +1,11 @@
 import type { ToolDef, MockContext, MockResult } from "../types";
 import { rng, int, pick, sample, HOSTNAMES, USERS, MALWARE_FAMILIES, fakeSha256, fakeIp, minutesAgoIso, nowIso, uuid, shortId } from "../helpers";
+import { fleetEndpoints, extId, macDashedUpper, type FleetDevice } from "../../fleet/fleet";
 
 // CrowdStrike Falcon - EDR. OAuth2 token, detections and device management.
+// The device inventory and Spotlight vulnerabilities project from the canonical
+// fleet (lib/fleet/fleet.ts, PLAN §4.4) so hostnames/serials/MACs line up with
+// Qualys, Trellix and the rest of the adapters - deterministic per fleetId.
 
 const SEVERITIES = ["Critical", "High", "Medium", "Low", "Informational"] as const;
 const TACTICS = ["Initial Access", "Execution", "Persistence", "Privilege Escalation", "Defense Evasion", "Credential Access", "Lateral Movement"] as const;
@@ -61,6 +65,70 @@ function device(id: string) {
     last_seen: minutesAgoIso(int(r, 1, 600)),
     first_seen: minutesAgoIso(int(r, 5000, 500000)),
   };
+}
+
+// ---- fleet projections (device inventory + Spotlight, PLAN §4.4) -----------
+
+/** One Falcon customer id (CID) for the whole emulated tenant - stable. */
+const FALCON_CID = extId("crowdstrike", "cid", 32);
+
+/** Fleet platform -> Falcon platform_name (fleetEndpoints() excludes network). */
+const PLATFORM_NAMES: Record<FleetDevice["platform"], string> = {
+  windows: "Windows",
+  mac: "Mac",
+  linux: "Linux",
+  network: "Linux",
+};
+
+/** Project a fleet endpoint into a Falcon device entity (stable per fleetId). */
+function fleetFalconDevice(d: FleetDevice) {
+  const r = rng("cs:fleetdev:" + d.fleetId);
+  return {
+    device_id: extId("crowdstrike", d.fleetId),
+    cid: FALCON_CID,
+    hostname: d.hostname,
+    mac_address: macDashedUpper(d.mac),
+    serial_number: d.serial,
+    os_version: d.os,
+    platform_name: PLATFORM_NAMES[d.platform],
+    product_type_desc: d.hostname.startsWith("SRV-") ? "Server" : "Workstation",
+    local_ip: d.ip,
+    external_ip: fakeIp(r),
+    agent_version: `7.${int(r, 10, 18)}.${int(r, 1000, 9999)}`,
+    status: "normal",
+    first_seen: minutesAgoIso(int(r, 5000, 500000)),
+    last_seen: minutesAgoIso(int(r, 1, 600)),
+    tags: d.tags,
+  };
+}
+
+/** CVSS-ish score bands per severity. */
+const CVSS_BANDS: Record<string, [number, number]> = {
+  CRITICAL: [9.0, 10.0],
+  HIGH: [7.0, 8.9],
+  MEDIUM: [4.0, 6.9],
+  LOW: [0.1, 3.9],
+};
+
+/** Deterministic Spotlight vulnerabilities for a fleet endpoint (0-4 per device). */
+function fleetVulnerabilities(d: FleetDevice) {
+  const deviceId = extId("crowdstrike", d.fleetId);
+  const count = int(rng("cs:vulncount:" + d.fleetId), 0, 4);
+  return Array.from({ length: count }, (_, i) => {
+    const r = rng(`cs:fleetvuln:${d.fleetId}:${i}`);
+    const severity = pick(r, ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const);
+    const [lo, hi] = CVSS_BANDS[severity];
+    return {
+      id: `${deviceId}_${int(r, 1e5, 9e5)}`,
+      cve_id: `CVE-${int(r, 2019, 2024)}-${int(r, 1000, 49999)}`,
+      severity,
+      status: "open",
+      score: +(lo + r() * (hi - lo)).toFixed(1),
+      host_info: { hostname: d.hostname, local_ip: d.ip },
+      created_timestamp: minutesAgoIso(int(r, 1440, 43200)),
+      updated_timestamp: minutesAgoIso(int(r, 1, 1440)),
+    };
+  });
 }
 
 // MITRE tactic/technique labels paired with their ATT&CK ids (index-aligned).
@@ -254,8 +322,48 @@ export const crowdstrike: ToolDef = {
       ],
       respond: (ctx: MockContext): MockResult => {
         const limit = Math.min(Number(ctx.query.limit) || 10, 50);
-        const r = rng("cs:devlist:" + limit);
-        return { status: 200, body: { meta: { pagination: { offset: 0, limit, total: int(r, limit, 1800) } }, resources: Array.from({ length: limit }).map(() => shortId("")), errors: [] } };
+        const offset = Math.max(0, Number(ctx.query.offset) || 0);
+        const ids = fleetEndpoints().map((d) => extId("crowdstrike", d.fleetId));
+        return { status: 200, body: { meta: { pagination: { offset, limit, total: ids.length } }, resources: ids.slice(offset, offset + limit), errors: [] } };
+      },
+    },
+    {
+      method: "GET",
+      path: "/devices/entities/devices/v2",
+      operation: "getDeviceEntities",
+      summary: "Resolve device ids (aids) to full device records; omit ids to return every managed device.",
+      aiTool: true,
+      params: [
+        { name: "ids", in: "query", type: "array", description: "Device ids (aids) to resolve, as returned by listDevices. Repeat the parameter (ids=..&ids=..) or pass a comma-separated list. Omit to return every managed device.", format: "device id (aid), 24-char hex", example: "<device_id>" },
+      ],
+      responseExample: {
+        meta: { query_time: 0.042, powered_by: "device-api", trace_id: "5f6ff9e2-6c4a-4a91-b7d0-1f2e3a4b5c6d" },
+        resources: [
+          {
+            device_id: "1a2b3c4d5e6f7a8b9c0d1e2f",
+            cid: FALCON_CID,
+            hostname: "LT-FIN-001",
+            mac_address: "0A-1B-2C-3D-4E-5F",
+            serial_number: "5CG1234ABCD",
+            os_version: "Windows 11 Pro 23H2",
+            platform_name: "Windows",
+            product_type_desc: "Workstation",
+            local_ip: "10.12.34.56",
+            external_ip: "198.51.100.24",
+            agent_version: "7.14.1802",
+            status: "normal",
+            first_seen: "2024-11-02T09:15:00.000Z",
+            last_seen: "2026-07-05T08:41:00.000Z",
+            tags: ["vip"],
+          },
+        ],
+        errors: [],
+      },
+      respond: (ctx: MockContext): MockResult => {
+        const wanted = (ctx.query.ids || "").split(",").map((s) => s.trim()).filter(Boolean);
+        const all = fleetEndpoints().map(fleetFalconDevice);
+        const resources = wanted.length ? all.filter((d) => wanted.includes(d.device_id)) : all;
+        return { status: 200, body: { meta: { query_time: 0.04, powered_by: "device-api", trace_id: uuid() }, resources, errors: [] } };
       },
     },
     {
@@ -441,20 +549,20 @@ export const crowdstrike: ToolDef = {
       method: "GET",
       path: "/spotlight/queries/vulnerabilities/v1",
       operation: "listVulnerabilities",
-      summary: "Search Spotlight vulnerability ids (query: filter, limit).",
+      summary: "Search Spotlight vulnerabilities; returns full vulnerability records (query: filter, limit).",
       aiTool: true,
       request: { filter: "status:'open'+cve.severity:'CRITICAL'", limit: "5" },
       params: [
         { name: "filter", in: "query", type: "string", description: "FQL filter over vulnerability fields; status accepts open/closed/reopen, cve.severity accepts CRITICAL/HIGH/MEDIUM/LOW.", format: "FQL filter", example: "status:'open'+cve.severity:'CRITICAL'" },
-        { name: "limit", in: "query", type: "integer", description: "Max vulnerability ids to return (capped at 100).", default: 10, example: 5 },
+        { name: "limit", in: "query", type: "integer", description: "Max vulnerability records to return (capped at 100).", default: 10, example: 5 },
         { name: "offset", in: "query", type: "integer", description: "Starting index for pagination.", default: 0 },
         { name: "sort", in: "query", type: "string", description: "FQL sort expression.", format: "FQL sort", example: "created_timestamp|desc" },
       ],
       respond: (ctx: MockContext): MockResult => {
         const limit = Math.min(Number(ctx.query.limit) || 10, 100);
-        const r = rng("cs:vulnlist:" + (ctx.query.filter || "") + limit);
-        const ids = Array.from({ length: limit }).map(() => `${shortId("")}_${int(r, 1e5, 9e5)}`);
-        return { status: 200, body: { meta: { query_time: 0.02, pagination: { offset: 0, limit, total: int(r, limit, 2400) } }, resources: ids, errors: [] } };
+        const offset = Math.max(0, Number(ctx.query.offset) || 0);
+        const all = fleetEndpoints().flatMap(fleetVulnerabilities);
+        return { status: 200, body: { meta: { query_time: 0.02, pagination: { offset, limit, total: all.length } }, resources: all.slice(offset, offset + limit), errors: [] } };
       },
     },
     {

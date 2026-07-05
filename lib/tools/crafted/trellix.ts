@@ -1,5 +1,6 @@
 import type { ToolDef, MockContext, MockResult } from "../types";
 import { rng, int, pick, sample, chance, fakeIp, minutesAgoIso, daysAgoIso, uuid, HOSTNAMES, USERS, MALWARE_FAMILIES } from "../helpers";
+import { fleetEndpoints, ownerOf, FLEET_ORG, macBareUpper, type FleetDevice } from "../../fleet/fleet";
 
 // Trellix ePolicy Orchestrator (ePO) - classic on-prem Web API. Commands are
 // invoked as GET/POST /remote/<command> and secured with HTTP Basic auth. The
@@ -93,6 +94,56 @@ function systemRecord(seed: string, hostname: string) {
     "EPOLeafNode.ManagedState": 1,
     "EPOLeafNode.AgentVersion": pick(r, AGENT_VERSIONS),
     "EPOBranchNode.AutoID": int(r, 2, 40),
+  };
+}
+
+// ---- fleet projection (managed-system inventory, PLAN §4.4) -----------------
+// system.find serves the canonical fleet's endpoints (lib/fleet/fleet.ts) so
+// serial/MAC/hostname line up with CrowdStrike and Qualys. Per the W4 contract
+// each record groups properties as nested EPOComputerProperties / EPOLeafNode /
+// EPOBranchNode objects. Deterministic per fleetId.
+
+/** NetBIOS-style domain for the fleet org (meridiandynamics.example). */
+const NETBIOS_DOMAIN = "MERIDIAN";
+
+/** Plausible OSVersion build strings per fleet platform. */
+const OS_VERSIONS: Record<FleetDevice["platform"], readonly string[]> = {
+  windows: ["10.0.19045", "10.0.22631", "10.0.20348"],
+  mac: ["14.7", "15.3"],
+  linux: ["5.15.0-101-generic", "6.8.0-31-generic"],
+  network: ["n/a"],
+};
+
+/** Project a fleet endpoint into an ePO managed-system record. */
+function fleetSystemRecord(d: FleetDevice) {
+  const r = rng("trellix:fleetsys:" + d.fleetId);
+  const owner = ownerOf(d);
+  const isServer = d.hostname.startsWith("SRV-");
+  const lastUpdate = daysAgoIso(int(r, 0, 6));
+  return {
+    EPOComputerProperties: {
+      ComputerName: d.hostname,
+      IPAddress: d.ip,
+      IPHostName: `${d.hostname.toLowerCase()}.${FLEET_ORG.domain}`,
+      OSType: d.os,
+      OSVersion: pick(r, OS_VERSIONS[d.platform]),
+      CPUType: pick(r, CPU_TYPES),
+      DomainName: NETBIOS_DOMAIN,
+      UserName: owner ? owner.upn.split("@")[0] : "SYSTEM",
+      SystemSerialNumber: d.serial,
+      NetAddress: macBareUpper(d.mac),
+      LastUpdate: lastUpdate,
+    },
+    EPOLeafNode: {
+      NodeName: d.hostname,
+      AutoID: int(r, 100, 9999),
+      AgentGUID: agentGuid(d.fleetId),
+      Tags: [isServer ? "Server" : "Workstation", "Managed", ...d.tags].join(", "),
+      ManagedState: 1,
+      AgentVersion: pick(r, AGENT_VERSIONS),
+      LastUpdate: lastUpdate,
+    },
+    EPOBranchNode: { AutoID: int(r, 2, 40) },
   };
 }
 
@@ -212,17 +263,15 @@ export const trellixEpo: ToolDef = {
       operation: "systemFind",
       summary: "Find managed systems in the System Tree by name, IP, or MAC (OK:-prefixed JSON array of property records).",
       aiTool: true,
-      request: { searchText: "WIN-FIN" },
+      request: { searchText: "LT-FIN" },
       params: [
-        { name: "searchText", in: "query", type: "string", required: true, description: "Free-text match against system name, IP address, or MAC address.", example: "WIN-FIN" },
+        { name: "searchText", in: "query", type: "string", required: true, description: "Free-text match against the managed system's name (empty returns every managed system).", example: "LT-FIN" },
         { name: ":output", in: "query", type: "string", required: false, description: "Response serialization format (ePO reserved arg). Mock always returns JSON.", enum: ["json", "xml", "terse", "verbose"], default: "terse", example: "json" },
       ],
       respond: (ctx: MockContext): MockResult => {
-        const q = (ctx.query.searchText || "").trim();
-        const matches = q ? HOSTNAMES.filter((h) => h.toLowerCase().includes(q.toLowerCase())) : HOSTNAMES.slice();
-        const hosts = matches.length ? matches : HOSTNAMES.slice(0, 4);
-        const rows = hosts.map((h, i) => systemRecord("find:" + q + ":" + i, h));
-        return okJson(rows);
+        const q = (ctx.query.searchText || "").trim().toLowerCase();
+        const systems = fleetEndpoints().filter((d) => !q || d.hostname.toLowerCase().includes(q));
+        return okJson(systems.map(fleetSystemRecord));
       },
     },
     {

@@ -2,6 +2,7 @@ import type { ToolDef, MockContext, MockResult } from "../types";
 import { rng, int, pick, sample, chance, fakeSha1, fakeSha256, nowIso, daysAgoIso, unixNow } from "../helpers";
 import { dbAvailable } from "../../db";
 import { listResources, putResource, ensureSeeded } from "../../engine/store";
+import { fleetUsers, type FleetUser } from "../../fleet/fleet";
 
 // Zscaler Internet Access (ZIA) admin API. Auth is a proprietary session: an
 // obfuscated apiKey plus admin username/password are POSTed to
@@ -39,9 +40,6 @@ const LOCATIONS: readonly [number, string][] = [
 ];
 const GROUPS: readonly [number, string][] = [
   [88001, "Engineering"], [88002, "Sales"], [88003, "Finance"], [88004, "Executives"], [88005, "Contractors"],
-];
-const DEPARTMENTS: readonly [number, string][] = [
-  [90001, "IT"], [90002, "Sales & Marketing"], [90003, "Finance"], [90004, "Human Resources"], [90005, "Operations"],
 ];
 const FIRST = ["Adam", "Beth", "Carlos", "Dana", "Ethan", "Fatima", "Grace", "Hiro", "Ivy", "Jamal", "Kira", "Liam"] as const;
 const LAST = ["Chen", "Kumar", "Silva", "Novak", "Okafor", "Rossi", "Haddad", "Yang", "Muller", "Ferreira", "Kowalski", "Nguyen"] as const;
@@ -138,19 +136,29 @@ function firewallRule(i: number) {
   };
 }
 
-/** A report user (stable per index). */
-function reportUser(i: number) {
-  const r = rng("zia:user:" + i);
-  const first = pick(r, FIRST);
-  const last = pick(r, LAST);
-  const [dId, dName] = pick(r, DEPARTMENTS);
+// ---- fleet projection (end-user directory, PLAN §4.4) -----------------------
+// /users serves the canonical fleet's user directory (lib/fleet/fleet.ts) so
+// emails line up with Entra ID (UPN correlation). Deterministic per fleetId.
+
+/** Stable ZIA integer user id for a fleet member ("usr-007" -> 700007). */
+const ziaUserId = (fleetId: string): number =>
+  700000 + (Number(fleetId.replace(/\D/g, "")) || int(rng("zia:uid:" + fleetId), 1, 99999));
+
+/** Stable department / group ids derived from the name. */
+const ziaDeptId = (name: string): number => 90000 + int(rng("zia:dept:" + name), 1, 999);
+const ziaGroupId = (name: string): number => 88000 + int(rng("zia:grp:" + name), 1, 999);
+
+/** Project a fleet user into a ZIA end-user record. */
+function fleetZiaUser(u: FleetUser) {
+  const groupName = `${u.department} Users`;
   return {
-    id: 700001 + i,
-    name: `${first} ${last}`,
-    email: `${first.toLowerCase()}.${last.toLowerCase()}@acme.com`,
-    groups: sample(r, GROUPS, int(r, 1, 2)).map(([id, name]) => ({ id, name })),
-    department: { id: dId, name: dName },
+    id: ziaUserId(u.fleetId),
+    name: u.displayName,
+    email: u.upn,
+    groups: [{ id: ziaGroupId(groupName), name: groupName }],
+    department: { id: ziaDeptId(u.department), name: u.department },
     adminUser: false,
+    isNonEditable: false,
     type: "REPORT_USER",
   };
 }
@@ -414,7 +422,7 @@ export const zscalerZia: ToolDef = {
       ],
       respond: (ctx: MockContext): MockResult => {
         const n = Math.min(Number(ctx.query.pageSize) || 10, 100);
-        return { status: 200, body: Array.from({ length: n }, (_, i) => reportUser(i)) };
+        return { status: 200, body: fleetUsers().slice(0, n).map(fleetZiaUser) };
       },
     },
     {

@@ -2,6 +2,7 @@ import type { ToolDef, MockContext, MockResult } from "../types";
 import { rng, int, pick, sample, chance, fakeIp, minutesAgoIso, daysAgoIso, nowIso, uuid, COUNTRIES } from "../helpers";
 import { dbAvailable } from "../../db";
 import { listResources, getResource, patchResource, ensureSeeded } from "../../engine/store";
+import { fleetUsers, extId, type FleetUser } from "../../fleet/fleet";
 
 // Microsoft Entra ID via Microsoft Graph v1.0. App-only (client-credentials)
 // bearer auth. Responses reproduce Graph's OData envelope (@odata.context /
@@ -65,6 +66,39 @@ function user(seed: string) {
     id: guid("user:" + seed),
     accountEnabled: chance(r, 0.9),
     department: pick(r, DEPTS),
+  };
+}
+
+// ---- fleet projection (directory users, PLAN §4.4) --------------------------
+// /users serves the canonical fleet's user directory (lib/fleet/fleet.ts) so
+// UPNs line up with Zscaler ZIA and the scaffold identity adapters (email
+// correlation). Deterministic per fleetId.
+
+/** Stable GUID-shaped object id for a fleet user (extId chunked 8-4-4-4-12). */
+function fleetObjectId(fleetId: string): string {
+  const h = extId("entra-id", fleetId, 32);
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+/** Project a fleet user into Graph's default user property set. */
+function fleetGraphUser(u: FleetUser) {
+  const r = rng("entra:fleetuser:" + u.fleetId);
+  const [givenName, ...rest] = u.displayName.split(" ");
+  return {
+    businessPhones: [`+1 425 555 01${int(r, 10, 99)}`],
+    displayName: u.displayName,
+    givenName,
+    jobTitle: u.title,
+    mail: u.upn,
+    mobilePhone: chance(r, 0.5) ? `+1 425 555 01${int(r, 10, 99)}` : null,
+    officeLocation: u.site,
+    preferredLanguage: "en-US",
+    surname: rest.join(" ") || givenName,
+    userPrincipalName: u.upn,
+    id: fleetObjectId(u.fleetId),
+    accountEnabled: u.enabled,
+    department: u.department,
+    createdDateTime: daysAgoIso(int(r, 90, 1500)),
   };
 }
 
@@ -299,9 +333,11 @@ export const entra: ToolDef = {
       ],
       respond: (ctx: MockContext): MockResult => {
         const top = Math.min(Number(ctx.query.$top) || 25, 100);
-        const users = Array.from({ length: top }, (_, i) => user("list:" + i));
+        let users = fleetUsers().map(fleetGraphUser);
+        const enabledMatch = /^accountEnabled\s+eq\s+(true|false)$/i.exec((ctx.query.$filter || "").trim());
+        if (enabledMatch) users = users.filter((u) => u.accountEnabled === (enabledMatch[1].toLowerCase() === "true"));
         const withCount = ctx.query.$count === "true";
-        return { status: 200, body: paged(users, "users", withCount ? { "@odata.count": 214 } : {}) };
+        return { status: 200, body: paged(users.slice(0, top), "users", withCount ? { "@odata.count": users.length } : {}) };
       },
     },
     {

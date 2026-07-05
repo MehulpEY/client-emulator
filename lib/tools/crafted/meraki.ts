@@ -16,6 +16,7 @@ import {
   MALWARE_FAMILIES,
   type RNG,
 } from "../helpers";
+import { fleetNetworkDevices, FLEET_ORG, macColon, type FleetDevice } from "../../fleet/fleet";
 
 // Cisco Meraki Dashboard API v1. Cloud-managed networking (MX appliances, MS
 // switches, MR access points). Auth is an API key sent in the X-Cisco-Meraki-API-Key
@@ -110,13 +111,13 @@ const FIRMWARE: Record<string, readonly string[]> = {
   wireless: ["wireless-29-5-1", "wireless-30-6", "wireless-31-1-4"],
   camera: ["camera-5-1", "camera-5-2"],
 };
-const LOCATIONS: readonly [number, number, string][] = [
-  [37.77041, -122.38726, "500 Terry Francois Blvd, San Francisco, CA 94158"],
-  [41.87811, -87.62980, "233 S Wacker Dr, Chicago, IL 60606"],
-  [30.26759, -97.74299, "301 Congress Ave, Austin, TX 78701"],
-  [40.71427, -74.00597, "60 Hudson St, New York, NY 10013"],
-  [39.52963, -119.81380, "100 Freight Dr, Reno, NV 89502"],
-];
+/** Anchor coordinates for the canonical fleet sites (lib/fleet/fleet.ts). */
+const SITE_GEO: Record<string, [number, number]> = {
+  "NYC-HQ": [40.71427, -74.00597],
+  "LON-01": [51.50735, -0.12776],
+  "SG-02": [1.35208, 103.81983],
+  REMOTE: [39.52963, -119.8138],
+};
 
 const MANUFACTURERS = ["Apple", "Dell", "Intel", "Samsung", "Google", "Lenovo", "HP", "Cisco Systems", "Raspberry Pi Foundation", "Espressif"] as const;
 const CLIENT_OSES = ["Windows 11", "Windows 10", "macOS 14", "iOS 17", "Android 14", "Ubuntu 22.04", "Chrome OS", null] as const;
@@ -176,24 +177,37 @@ function network(org: string, seed: string) {
   };
 }
 
-function device(seed: string) {
-  const r = rng("meraki:dev:" + seed);
-  const productType = pick(r, ["appliance", "switch", "wireless"]);
-  const model = pick(r, MODELS[productType]);
-  const [lat, lng, address] = pick(r, LOCATIONS);
+// ---- fleet projection (org device inventory, PLAN §4.4) --------------------
+// getOrganizationDevices serves the canonical fleet's network gear
+// (lib/fleet/fleet.ts) so serials/MACs line up across adapters. The fleet os
+// string carries the model, e.g. "MR46 (AP)" -> model "MR46" / productType
+// "wireless". Deterministic per fleetId.
+
+/** Fleet os string -> Meraki model + productType. */
+function fleetModel(os: string): { model: string; productType: string } {
+  const model = os.split(" ")[0];
+  const productType = model.startsWith("MR") ? "wireless" : model.startsWith("MS") ? "switch" : "appliance";
+  return { model, productType };
+}
+
+/** Project a fleet network device into an org inventory device record. */
+function fleetOrgDevice(d: FleetDevice) {
+  const r = rng("meraki:fleetdev:" + d.fleetId);
+  const { model, productType } = fleetModel(d.os);
+  const [lat, lng] = SITE_GEO[d.site] ?? SITE_GEO["NYC-HQ"];
   return {
-    name: pick(r, NAMES_BY_TYPE[productType]),
-    serial: serial("d:" + seed),
-    mac: macAddr("d:" + seed, true),
+    name: d.hostname,
+    serial: d.serial,
+    mac: macColon(d.mac),
     model,
-    networkId: networkId("dn:" + seed),
+    networkId: FLEET_ORG.merakiNetworkId,
     productType,
-    lat,
-    lng,
-    address,
+    lat: +(lat + (r() - 0.5) * 0.01).toFixed(5),
+    lng: +(lng + (r() - 0.5) * 0.01).toFixed(5),
+    address: d.site,
     firmware: pick(r, FIRMWARE[productType]),
-    lanIp: privateIp(r),
-    tags: sample(r, NET_TAGS, int(r, 0, 2)),
+    lanIp: d.ip,
+    tags: d.tags,
   };
 }
 
@@ -435,7 +449,10 @@ export const ciscoMeraki: ToolDef = {
       ],
       respond: (ctx: MockContext): MockResult => {
         const n = perPage(ctx, 12, 1000);
-        return { status: 200, body: Array.from({ length: n }, (_, i) => device(ctx.params.organizationId + ":" + i)) };
+        const typeFilter = (ctx.query.productTypes || "").split(",").map((s) => s.trim()).filter(Boolean);
+        let devices = fleetNetworkDevices().map(fleetOrgDevice);
+        if (typeFilter.length) devices = devices.filter((d) => typeFilter.includes(d.productType));
+        return { status: 200, body: devices.slice(0, n) };
       },
     },
     {
