@@ -1,7 +1,7 @@
 import {
   ShieldHalf, Radar, Laptop, ScrollText, Network, KeyRound, FileLock2, ShieldAlert,
   Gauge, Workflow, GraduationCap, BadgeCheck, Microscope, MousePointerClick, Lock,
-  Smartphone, Contact, Boxes, type LucideIcon, HelpCircle,
+  Smartphone, Contact, Boxes, CloudCog, type LucideIcon, HelpCircle,
 } from "lucide-react";
 import type { CategoryId } from "./tools/types";
 import { CATEGORY_MAP } from "./tools/categories";
@@ -9,7 +9,7 @@ import { CATEGORY_MAP } from "./tools/categories";
 const ICONS: Record<string, LucideIcon> = {
   ShieldHalf, Radar, Laptop, ScrollText, Network, KeyRound, FileLock2, ShieldAlert,
   Gauge, Workflow, GraduationCap, BadgeCheck, Microscope, MousePointerClick, Lock,
-  Smartphone, Contact, Boxes,
+  Smartphone, Contact, Boxes, CloudCog,
 };
 
 export function iconFor(name: string): LucideIcon {

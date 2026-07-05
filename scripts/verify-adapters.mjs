@@ -66,13 +66,6 @@ async function pollFetchDone(connectionId, timeoutMs = 60_000) {
 async function main() {
   log(`\nAdapter platform verification against ${BASE}\n`);
 
-  await step("health", async () => {
-    const { status, json } = await req("GET", "/api/health");
-    assert(status === 200 && json?.ok !== false, `health ${status}`);
-    assert(json?.db?.reachable, "DB not reachable — apply schema + set DATABASE_URL first");
-    return `db ok, catalog ${json?.catalog?.tools ?? "?"} tools`;
-  });
-
   await step("login (admin)", async () => {
     assert(EMAIL && PASSWORD, "set EMU_ADMIN_EMAIL / EMU_ADMIN_PASSWORD");
     const r = await fetch(BASE + "/api/auth/login", {
@@ -84,6 +77,13 @@ async function main() {
     const setCookie = r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get("set-cookie")].filter(Boolean);
     cookie = setCookie.map((c) => c.split(";")[0]).join("; ");
     assert(cookie.includes("emu_session"), "no session cookie returned");
+  });
+
+  await step("health", async () => {
+    const { status, json } = await req("GET", "/api/health");
+    assert(status === 200 && json?.ok !== false, `health ${status}`);
+    assert(json?.db?.reachable, "DB not reachable — apply schema + set DATABASE_URL first");
+    return `db ok, catalog ${json?.catalog?.tools ?? "?"} tools`;
   });
 
   await step("adapters catalog lists >= 15 with meta", async () => {
