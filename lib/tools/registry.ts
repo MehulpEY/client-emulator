@@ -15,6 +15,14 @@ import { zscalerZia } from "./crafted/zscaler-zia";
 import { zscalerRba } from "./crafted/zscaler-rba";
 import { zscalerAiGuard } from "./crafted/zscaler-aiguard";
 import { appomniAgentGuard } from "./crafted/appomni";
+import { okta } from "./crafted/okta";
+import { tenable } from "./crafted/tenable";
+import { sentinelOne } from "./crafted/sentinelone";
+import { intune } from "./crafted/intune";
+import { jamfPro } from "./crafted/jamf";
+import { serviceNow } from "./crafted/servicenow";
+import { wiz } from "./crafted/wiz";
+import { rapid7 } from "./crafted/rapid7";
 
 // The catalog is a curated set of high-fidelity, hand-crafted tools. Each one
 // mirrors its real vendor API (paths, auth, field names) with deterministic,
@@ -35,6 +43,15 @@ const CRAFTED: ToolDef[] = [
   zscalerRba,
   zscalerAiGuard,
   appomniAgentGuard,
+  // Scaffold adapters (crafted: false) - fleet-projected inventory, W6.
+  okta,
+  tenable,
+  sentinelOne,
+  intune,
+  jamfPro,
+  serviceNow,
+  wiz,
+  rapid7,
 ];
 
 /** The full catalog, alphabetical by display name. Code is the source of truth. */

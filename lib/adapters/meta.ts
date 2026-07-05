@@ -240,6 +240,148 @@ export const ADAPTER_META: AdapterMeta[] = [
     permissionsRequired: ["API token with posture read scope"],
     sessionTtlMinutes: 30,
   },
+  // -------------------------------------------------------------------------
+  // Scaffold adapters (W6). Inventory endpoints project the canonical fleet
+  // and expose the generic-normalizer keys (id / hostname|name / mac / serial /
+  // email / os / ip / lastSeen) at the top level of each record, at the
+  // recordsPath declared on each fetch step.
+  // -------------------------------------------------------------------------
+  {
+    toolId: "okta",
+    blurb: "Directory users, groups and lifecycle actions from the Okta identity cloud.",
+    categories: ["identity"],
+    assetTypes: ["user"],
+    connectionParams: [
+      domain("Okta Domain", "acme.okta.com"),
+      password("api_token", "API Token", "SSWS API token from Security > API > Tokens"),
+    ],
+    fetchSteps: [
+      { operation: "listUsers", assetType: "user", recordsPath: "$", summary: "Directory users — GET /api/v1/users (root array)" },
+    ],
+    heartbeat: { operation: "listUsers", query: { limit: "1" } },
+    permissionsRequired: ["okta.users.read", "okta.groups.read", "okta.users.manage (lifecycle actions)"],
+    sessionTtlMinutes: 60,
+  },
+  {
+    toolId: "tenable",
+    blurb: "Asset inventory and vulnerability findings from Tenable Vulnerability Management.",
+    categories: ["vuln-mgmt"],
+    assetTypes: ["device", "vulnerability"],
+    connectionParams: [
+      domain("Tenable Host", "cloud.tenable.com", "cloud.tenable.com"),
+      p({ key: "access_key", label: "Access Key", type: "string", required: true, placeholder: "API access key" }),
+      password("secret_key", "Secret Key", "API secret key (paired with the access key)"),
+    ],
+    fetchSteps: [
+      { operation: "listAssets", assetType: "device", recordsPath: "assets", summary: "Asset inventory — GET /assets (records at assets[])" },
+      { operation: "listVulnerabilities", assetType: "vulnerability", recordsPath: "vulnerabilities", summary: "Vulnerability findings — GET /vulns (records at vulnerabilities[])" },
+    ],
+    heartbeat: { operation: "getServerStatus" },
+    permissionsRequired: ["User API keys (Standard role or higher)", "Scans: Can Execute (launch action)"],
+    sessionTtlMinutes: 60,
+  },
+  {
+    toolId: "sentinelone",
+    blurb: "EDR agent inventory, threats and network containment from SentinelOne Singularity.",
+    categories: ["edr"],
+    assetTypes: ["device"],
+    connectionParams: [
+      domain("Management Console URL", "usea1-partners.sentinelone.net"),
+      password("api_token", "API Token", "Console user API token (sent as \"ApiToken <token>\")"),
+    ],
+    fetchSteps: [
+      { operation: "listAgents", assetType: "device", recordsPath: "data", summary: "Agent inventory — GET /web/api/v2.1/agents (records at data[])" },
+    ],
+    heartbeat: { operation: "getSystemInfo" },
+    permissionsRequired: ["Viewer role (Agents: View)", "Incident Responder role (disconnect action)"],
+    sessionTtlMinutes: 30,
+  },
+  {
+    toolId: "intune",
+    blurb: "Managed Windows/macOS devices, compliance and remote actions from Microsoft Intune.",
+    categories: ["device-mgmt"],
+    assetTypes: ["device"],
+    connectionParams: [
+      p({ key: "tenant_id", label: "Azure Tenant ID", type: "string", required: true, placeholder: "00000000-0000-0000-0000-000000000000" }),
+      p({ key: "client_id", label: "Azure Client ID", type: "string", required: true, placeholder: "App registration (client) id" }),
+      password("client_secret", "Azure Client Secret"),
+    ],
+    fetchSteps: [
+      { operation: "listManagedDevices", assetType: "device", recordsPath: "value", summary: "Managed devices — GET /deviceManagement/managedDevices (records at value[])" },
+    ],
+    heartbeat: { operation: "listManagedDevices", query: { $top: "1" } },
+    permissionsRequired: ["DeviceManagementManagedDevices.Read.All", "DeviceManagementManagedDevices.PrivilegedOperations.All (sync action)"],
+    sessionTtlMinutes: 60,
+  },
+  {
+    toolId: "jamf",
+    blurb: "macOS computer inventory and management commands from Jamf Pro.",
+    categories: ["device-mgmt"],
+    assetTypes: ["device"],
+    connectionParams: [
+      domain("Jamf Pro Server URL", "company.jamfcloud.com"),
+      username(),
+      password("password", "Password"),
+    ],
+    fetchSteps: [
+      { operation: "listComputersInventory", assetType: "device", recordsPath: "results", summary: "Computer inventory — GET /api/v1/computers-inventory (records at results[])" },
+    ],
+    heartbeat: { operation: "getJamfProVersion" },
+    permissionsRequired: ["Read Computers", "Send Computer Remote Commands (redeploy action)"],
+    sessionTtlMinutes: 30,
+  },
+  {
+    toolId: "servicenow",
+    blurb: "CMDB configuration items for the whole estate from the ServiceNow Table API.",
+    categories: ["itam", "device-mgmt"],
+    assetTypes: ["device"],
+    connectionParams: [
+      domain("ServiceNow Instance", "acme.service-now.com"),
+      username(),
+      password("password", "Password"),
+    ],
+    fetchSteps: [
+      { operation: "listComputers", assetType: "device", recordsPath: "result", summary: "Computer CIs — GET /api/now/table/cmdb_ci_computer (records at result[])" },
+    ],
+    heartbeat: { operation: "listComputers", query: { sysparm_limit: "1" } },
+    permissionsRequired: ["cmdb_read (or itil) role with Table API access"],
+    sessionTtlMinutes: 30,
+  },
+  {
+    toolId: "wiz",
+    blurb: "Cloud VM inventory and security issues from the Wiz CNAPP platform.",
+    categories: ["cloud-security", "vuln-mgmt"],
+    assetTypes: ["device", "alert"],
+    connectionParams: [
+      domain("API Endpoint URL", "api.us17.app.wiz.io"),
+      p({ key: "client_id", label: "Service Account Client ID", type: "string", required: true }),
+      password("client_secret", "Service Account Client Secret"),
+    ],
+    fetchSteps: [
+      { operation: "listCloudResources", assetType: "device", recordsPath: "data.nodes", summary: "Cloud VM inventory — GET /v1/cloud-resources (records at data.nodes[])" },
+    ],
+    heartbeat: { operation: "listCloudResources", query: { first: "1" } },
+    permissionsRequired: ["Service account scopes: read:cloud_resources, read:issues, update:issues"],
+    sessionTtlMinutes: 60,
+  },
+  {
+    toolId: "rapid7",
+    blurb: "Scanned asset inventory, sites and scan launch from Rapid7 InsightVM.",
+    categories: ["vuln-mgmt"],
+    assetTypes: ["device"],
+    connectionParams: [
+      domain("InsightVM Console URL", "insightvm.company.example"),
+      p({ key: "port", label: "Port", type: "number", default: 3780 }),
+      username(),
+      password("password", "Password"),
+    ],
+    fetchSteps: [
+      { operation: "listAssets", assetType: "device", recordsPath: "resources", summary: "Scanned assets — GET /api/3/assets (records at resources[])" },
+    ],
+    heartbeat: { operation: "listSites" },
+    permissionsRequired: ["User with Asset: Read + Site: Run Scan"],
+    sessionTtlMinutes: 30,
+  },
 ];
 
 const META_BY_TOOL = new Map(ADAPTER_META.map((m) => [m.toolId, m]));
