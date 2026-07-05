@@ -15,6 +15,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { id: "edr", label: "Endpoint (EDR)", icon: "Laptop", blurb: "Detections, devices and response actions on endpoints." },
   { id: "siem", label: "SIEM & Logging", icon: "ScrollText", blurb: "Offenses, searches and event analytics." },
   { id: "network", label: "Network & Firewall", icon: "Network", blurb: "Firewall policy, web gateways and managed networking." },
+  { id: "cloud-security", label: "Cloud Security", icon: "CloudCog", blurb: "Cloud resource inventory, posture findings and issue management." },
   { id: "identity", label: "Identity & Access", icon: "KeyRound", blurb: "Users, sign-ins, verification and access management." },
   { id: "dlp", label: "Data Loss Prevention", icon: "FileLock2", blurb: "Detect and redact sensitive data (PII/PHI/PCI)." },
   { id: "vuln-mgmt", label: "Vulnerability Management", icon: "ShieldAlert", blurb: "Asset scans, findings and remediation tracking." },
@@ -26,6 +27,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { id: "automation", label: "Automation & Browser", icon: "MousePointerClick", blurb: "Browser agents and captcha solving." },
   { id: "data-security", label: "Data Security", icon: "Lock", blurb: "Data-centric protection, rights and encryption." },
   { id: "device-mgmt", label: "Device & Fleet", icon: "Smartphone", blurb: "Track, secure and act on a device fleet." },
+  { id: "itam", label: "ITAM & CMDB", icon: "Boxes", blurb: "IT asset inventory, configuration items and CMDB records." },
   { id: "enrichment", label: "Identity Enrichment", icon: "Contact", blurb: "Resolve and enrich person/company identifiers." },
 ];
 

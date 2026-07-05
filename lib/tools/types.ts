@@ -11,6 +11,7 @@ export type CategoryId =
   | "edr"
   | "siem"
   | "network"
+  | "cloud-security"
   | "identity"
   | "dlp"
   | "vuln-mgmt"
@@ -22,6 +23,7 @@ export type CategoryId =
   | "automation"
   | "data-security"
   | "device-mgmt"
+  | "itam"
   | "enrichment";
 
 /** Runtime context handed to a response generator. */
