@@ -35,7 +35,7 @@ export function SetupForm() {
         setBusy(false);
         return;
       }
-      router.push("/");
+      router.push("/overview");
       router.refresh();
     } catch {
       setError("Network error - please try again.");

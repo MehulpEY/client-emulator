@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogIn } from "lucide-react";
 import { Spinner } from "@/components/ui";
@@ -29,7 +30,7 @@ export function LoginForm() {
         setBusy(false);
         return;
       }
-      const next = new URLSearchParams(window.location.search).get("next") || "/";
+      const next = new URLSearchParams(window.location.search).get("next") || "/overview";
       router.push(next);
       router.refresh();
     } catch {
@@ -51,14 +52,22 @@ export function LoginForm() {
           <input className="field" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
         </label>
         <label className="block">
-          <span className="label mb-1.5 block">Password</span>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="label">Password</span>
+            <Link href="/forgot-password" tabIndex={-1} className="text-[11.5px] text-text3 transition-colors hover:text-accent-fg">
+              Forgot password?
+            </Link>
+          </div>
           <input className="field" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" />
         </label>
-        {error && <div className="border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">{error}</div>}
+        {error && <div className="rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">{error}</div>}
         <button type="submit" className="btn-primary w-full" disabled={busy}>
           {busy ? <Spinner label="Signing in..." /> : <><LogIn size={14} /> Sign in</>}
         </button>
       </form>
+      <p className="mt-4 text-center text-[11.5px] text-text3">
+        No account? Access is invitation-only — ask an administrator.
+      </p>
     </div>
   );
 }
