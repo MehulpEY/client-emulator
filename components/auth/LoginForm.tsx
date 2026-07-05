@@ -3,11 +3,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { LogIn } from "lucide-react";
 import { Spinner } from "@/components/ui";
 
+const rise: Variants = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.16, 1, 0.3, 1] } },
+};
+const still: Variants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.35 } } };
+
 export function LoginForm() {
   const router = useRouter();
+  const reduced = useReducedMotion();
+  const item = reduced ? still : rise;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,34 +49,76 @@ export function LoginForm() {
   }
 
   return (
-    <div className="panel p-6">
-      <div className="mb-5">
-        <div className="eyebrow mb-2">Sign in</div>
-        <h1 className="text-[18px] font-bold tracking-[-0.01em]">Welcome back</h1>
-        <p className="mt-1 text-[12.5px] text-text3">Sign in to the Client Tool Emulator.</p>
-      </div>
-      <form onSubmit={submit} className="space-y-3">
-        <label className="block">
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={{ hidden: {}, show: { transition: { staggerChildren: 0.07 } } }}
+    >
+      <motion.div variants={item} className="mb-7">
+        <div className="eyebrow mb-3">Sign in</div>
+        <h1 className="text-[24px] font-bold leading-[1.15] tracking-[-0.02em]">Welcome back</h1>
+        <p className="mt-2 text-[13px] leading-[1.6] text-text3">
+          Sign in to manage adapters, connections and the correlated inventory.
+        </p>
+      </motion.div>
+
+      <form onSubmit={submit} className="space-y-4">
+        <motion.label variants={item} className="block">
           <span className="label mb-1.5 block">Email</span>
-          <input className="field" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" />
-        </label>
-        <label className="block">
+          <input
+            className="field h-10"
+            type="email"
+            autoComplete="email"
+            autoFocus
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+          />
+        </motion.label>
+
+        <motion.label variants={item} className="block">
           <div className="mb-1.5 flex items-center justify-between">
             <span className="label">Password</span>
             <Link href="/forgot-password" tabIndex={-1} className="text-[11.5px] text-text3 transition-colors hover:text-accent-fg">
               Forgot password?
             </Link>
           </div>
-          <input className="field" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Your password" />
-        </label>
-        {error && <div className="rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">{error}</div>}
-        <button type="submit" className="btn-primary w-full" disabled={busy}>
-          {busy ? <Spinner label="Signing in..." /> : <><LogIn size={14} /> Sign in</>}
-        </button>
+          <input
+            className="field h-10"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Your password"
+          />
+        </motion.label>
+
+        {error && (
+          <motion.div
+            initial={reduced ? false : { opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger"
+            role="alert"
+          >
+            {error}
+          </motion.div>
+        )}
+
+        <motion.div variants={item}>
+          <button type="submit" className="btn-primary h-10 w-full text-[13px]" disabled={busy}>
+            {busy ? <Spinner label="Signing in..." /> : <><LogIn size={14} /> Sign in</>}
+          </button>
+        </motion.div>
       </form>
-      <p className="mt-4 text-center text-[11.5px] text-text3">
-        No account? Access is invitation-only — ask an administrator.
-      </p>
-    </div>
+
+      <motion.div variants={item} className="mt-6 border-t border-hair pt-4">
+        <p className="text-[11.5px] leading-[1.6] text-text3">
+          Access is invitation-only. No account? Ask an administrator to invite you —
+          invites arrive by email and expire after 72 hours.
+        </p>
+      </motion.div>
+    </motion.div>
   );
 }
