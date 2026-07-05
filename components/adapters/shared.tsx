@@ -3,6 +3,7 @@
 // No "use client" directive — everything here is render-only and is consumed
 // by the client components in this folder.
 
+import type { ReactNode } from "react";
 import type { ChipVariant } from "@/components/ui";
 import type { AssetType, ConnectionSimulate, ConnectionStatus } from "@/lib/adapters/types";
 import { cn } from "@/lib/cn";
@@ -112,6 +113,15 @@ export function MonogramTile({ name, className }: { name: string; className?: st
     >
       {monogram(name)}
     </span>
+  );
+}
+
+/** Table header cell shared by the connections + fetch-history tables. */
+export function Th({ children, className, title }: { children?: ReactNode; className?: string; title?: string }) {
+  return (
+    <th className={cn("whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold text-text3", className)} title={title}>
+      {children}
+    </th>
   );
 }
 

@@ -4,14 +4,14 @@
 // expandable per-step detail. Polls every 5s while any run is still `running`;
 // otherwise data refreshes on mount / manual refresh.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Database, History, RotateCw } from "lucide-react";
 import { adaptersApi } from "@/lib/api-adapters";
 import type { ConnectionRow, FetchRunRow, FetchRunStatus } from "@/lib/adapters/types";
 import { Chip, EmptyState, Panel, SkeletonRows, StatusBadge, type ChipVariant } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
-import { absTime, fmtInt, formatMs } from "./shared";
+import { absTime, fmtInt, formatMs, Th } from "./shared";
 
 const POLL_MS = 5000;
 const LIMIT = 50;
@@ -35,10 +35,15 @@ export function FetchHistoryPanel({ toolId, connections }: Props) {
 
   const labelById = useMemo(() => new Map(connections.map((c) => [c.connectionId, c.label])), [connections]);
 
-  const load = useCallback(
-    () => adaptersApi.fetches({ tool: toolId, limit: LIMIT }).then(setData).catch(() => { /* transient: retry on next poll */ }),
-    [toolId],
-  );
+  // Sequence guard: a slow stale response never overwrites a fresher one.
+  const seq = useRef(0);
+  const load = useCallback(() => {
+    const mine = ++seq.current;
+    return adaptersApi
+      .fetches({ tool: toolId, limit: LIMIT })
+      .then((d) => { if (mine === seq.current) setData(d); })
+      .catch(() => { /* transient: retry on next poll */ });
+  }, [toolId]);
 
   useEffect(() => {
     load();
@@ -48,7 +53,7 @@ export function FetchHistoryPanel({ toolId, connections }: Props) {
   const anyRunning = data?.runs.some((r) => r.status === "running") ?? false;
   useEffect(() => {
     if (!anyRunning) return;
-    const id = setInterval(load, POLL_MS);
+    const id = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
     return () => clearInterval(id);
   }, [anyRunning, load]);
 
@@ -107,14 +112,6 @@ export function FetchHistoryPanel({ toolId, connections }: Props) {
         </div>
       )}
     </Panel>
-  );
-}
-
-function Th({ children, className, title }: { children?: ReactNode; className?: string; title?: string }) {
-  return (
-    <th className={cn("whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold text-text3", className)} title={title}>
-      {children}
-    </th>
   );
 }
 

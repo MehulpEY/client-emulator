@@ -27,7 +27,7 @@ const FETCH_FLOOR_S = 60;
 const DEFAULT_FETCH_S = 900; // mirrors the schema default (15 min discovery cycle)
 const CLOSE_AFTER_TEST_MS = 1800;
 
-const SIMULATE_VALUES: ConnectionSimulate[] = ["none", "revoked_credentials", "unreachable", "slow"];
+const SIMULATE_VALUES = Object.keys(SIMULATE_META) as ConnectionSimulate[];
 
 type Phase = "idle" | "checking" | "saving" | "testing" | "done";
 
@@ -167,6 +167,9 @@ export function AddConnectionModal({ toolId, toolName, meta, onClose, onSaved, c
     }
     setPhase("saving");
     setResult(null);
+
+    // Create — a failure HERE leaves nothing behind, so retrying is safe.
+    let createdId: string;
     try {
       const r = await adaptersApi.createConnection(toolId, {
         label: label.trim(),
@@ -180,20 +183,29 @@ export function AddConnectionModal({ toolId, toolName, meta, onClose, onSaved, c
         setResult({ tone: "danger", lines: [r.error ?? "create failed"] });
         return;
       }
-      await onSaved(); // the new row appears (pending) while we test it
-      setPhase("testing");
-      const t = await adaptersApi.testConnection(r.connection.connectionId);
+      createdId = r.connection.connectionId;
+    } catch {
+      setPhase("idle");
+      setResult({ tone: "danger", lines: ["create failed — request error"] });
+      return;
+    }
+
+    // The connection now EXISTS — never report a follow-up failure as a save
+    // failure (that reads as "retry", which would create a duplicate).
+    await onSaved(); // the new row appears (pending) while we test it
+    setPhase("testing");
+    try {
+      const t = await adaptersApi.testConnection(createdId);
       setLanded({
         status: t.status ?? (t.ok ? "connected" : "error"),
         reason: t.statusReason ?? (t.ok ? null : t.error ?? null),
       });
-      setPhase("done");
-      await onSaved();
-      closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_TEST_MS);
     } catch {
-      setPhase("idle");
-      setResult({ tone: "danger", lines: ["save failed — request error"] });
+      setResult({ tone: "ok", lines: ["Connection saved. The follow-up test could not run — use Test in the table."] });
     }
+    setPhase("done");
+    await onSaved();
+    closeTimer.current = window.setTimeout(onClose, CLOSE_AFTER_TEST_MS);
   }
 
   async function saveEdit() {

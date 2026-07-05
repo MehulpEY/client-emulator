@@ -11,17 +11,22 @@ import {
 } from "lucide-react";
 import { adaptersApi } from "@/lib/api-adapters";
 import type { AdapterMeta, ConnectionRow } from "@/lib/adapters/types";
-import { Chip, EmptyState, Panel, SkeletonRows, Spinner, useConfirm } from "@/components/ui";
+import { Chip, EmptyState, Panel, SkeletonRows, Spinner, useConfirm, type ChipVariant } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { AddConnectionModal } from "./AddConnectionModal";
-import { absTime, fmtInt, formatMs, sessionReusePct, SIMULATE_META, STATUS_CHIP } from "./shared";
+import { absTime, fmtInt, formatMs, sessionReusePct, SIMULATE_META, STATUS_CHIP, Th } from "./shared";
 
 type RowAction = "test" | "fetch" | "toggle" | "delete";
 
+type NoteTone = "ok" | "warn" | "danger" | "info";
+
+/** Note tint from the canonical §4.7 chip variant (accent/default/muted → danger never applies here). */
+const toneOf = (v: ChipVariant): NoteTone => (v === "ok" || v === "warn" || v === "info" ? v : "danger");
+
 interface RowNote {
   id: string;
-  tone: "ok" | "warn" | "danger";
+  tone: NoteTone;
   text: string;
 }
 
@@ -32,10 +37,14 @@ interface Props {
   /** null while the first load is in flight. */
   connections: ConnectionRow[] | null;
   reachable: boolean;
+  /** Create/edit/delete/toggle are admin-only server-side. */
+  isAdmin: boolean;
   onChanged: () => Promise<void> | void;
 }
 
-export function ConnectionsPanel({ toolId, toolName, meta, connections, reachable, onChanged }: Props) {
+const ADMIN_ONLY = "Administrator role required";
+
+export function ConnectionsPanel({ toolId, toolName, meta, connections, reachable, isAdmin, onChanged }: Props) {
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ connection?: ConnectionRow } | null>(null);
   const [busy, setBusy] = useState<{ id: string; action: RowAction } | null>(null);
@@ -50,7 +59,7 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
       if (r.status) {
         setNote({
           id: c.connectionId,
-          tone: r.status === "connected" ? "ok" : r.status === "degraded" ? "warn" : "danger",
+          tone: toneOf(STATUS_CHIP[r.status]),
           text: `Test landed on ${r.status}${r.statusReason ? ` — ${r.statusReason}` : ""}${r.latencyMs !== undefined ? ` (${formatMs(r.latencyMs)})` : ""}`,
         });
       } else {
@@ -125,7 +134,12 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
   }
 
   const addButton = (
-    <button className="btn-primary h-8 !text-[12px]" onClick={() => setModal({})} disabled={!reachable}>
+    <button
+      className="btn-primary h-8 !text-[12px]"
+      onClick={() => setModal({})}
+      disabled={!reachable || !isAdmin}
+      title={!isAdmin ? ADMIN_ONLY : undefined}
+    >
       <Plus size={13} /> Add connection
     </button>
   );
@@ -145,8 +159,12 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
           <EmptyState
             icon={PlugZap}
             title="No connections yet"
-            sub="Create a connection to provision a real credential, start heartbeats and run discovery fetches."
-            action={<button className="btn-primary" onClick={() => setModal({})}><Plus size={14} /> Add connection</button>}
+            sub={
+              isAdmin
+                ? "Create a connection to provision a real credential, start heartbeats and run discovery fetches."
+                : "An administrator can create a connection to provision a credential and start discovery fetches."
+            }
+            action={isAdmin ? <button className="btn-primary" onClick={() => setModal({})}><Plus size={14} /> Add connection</button> : undefined}
           />
         ) : (
           <div className="emu-scroll overflow-x-auto">
@@ -171,6 +189,7 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
                       key={c.connectionId}
                       c={c}
                       canFetch={canFetch}
+                      canManage={isAdmin}
                       rowBusy={rowBusy}
                       busyAction={rowBusy ? busy!.action : null}
                       note={note?.id === c.connectionId ? note : null}
@@ -203,20 +222,13 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
   );
 }
 
-function Th({ children, className, title }: { children?: ReactNode; className?: string; title?: string }) {
-  return (
-    <th className={cn("whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold text-text3", className)} title={title}>
-      {children}
-    </th>
-  );
-}
-
 function ConnRow({
-  c, canFetch, rowBusy, busyAction, note,
+  c, canFetch, canManage, rowBusy, busyAction, note,
   onTest, onFetch, onToggle, onEdit, onDelete, onDismissNote,
 }: {
   c: ConnectionRow;
   canFetch: boolean;
+  canManage: boolean;
   rowBusy: boolean;
   busyAction: RowAction | null;
   note: RowNote | null;
@@ -254,8 +266,8 @@ function ConnRow({
           <Switch
             checked={c.enabled}
             onChange={onToggle}
-            disabled={rowBusy}
-            label={c.enabled ? "Disable connection" : "Enable connection"}
+            disabled={rowBusy || !canManage}
+            label={!canManage ? ADMIN_ONLY : c.enabled ? "Disable connection" : "Enable connection"}
           />
         </td>
         <td className="whitespace-nowrap px-4 py-2.5 text-text2" title={absTime(c.lastHeartbeatAt)}>
@@ -295,10 +307,10 @@ function ConnRow({
             >
               <DownloadCloud size={13} />
             </IconBtn>
-            <IconBtn title="Edit connection" onClick={onEdit} disabled={rowBusy}>
+            <IconBtn title={canManage ? "Edit connection" : ADMIN_ONLY} onClick={onEdit} disabled={rowBusy || !canManage}>
               <Pencil size={13} />
             </IconBtn>
-            <IconBtn title="Delete connection" onClick={onDelete} disabled={rowBusy} busy={busyAction === "delete"} danger>
+            <IconBtn title={canManage ? "Delete connection" : ADMIN_ONLY} onClick={onDelete} disabled={rowBusy || !canManage} busy={busyAction === "delete"} danger>
               <Trash2 size={13} />
             </IconBtn>
           </div>
@@ -313,6 +325,7 @@ function ConnRow({
                 note.tone === "ok" && "border-ok-line bg-ok-bg text-ok",
                 note.tone === "warn" && "border-warn-line bg-warn-bg text-warn",
                 note.tone === "danger" && "border-danger-line bg-danger-bg text-danger",
+                note.tone === "info" && "border-info-line bg-info-bg text-info",
               )}
             >
               <span className="min-w-0 break-words">{note.text}</span>
@@ -340,7 +353,7 @@ function Switch({ checked, onChange, disabled, label }: { checked: boolean; onCh
       onClick={onChange}
       className={cn(
         "relative inline-flex h-[18px] w-[32px] shrink-0 items-center rounded-full border transition-colors",
-        checked ? "border-accent bg-accent" : "border-borderStrong bg-surface-sunk",
+        checked ? "border-accent bg-accent" : "border-borderStrong bg-sunk",
         disabled ? "cursor-default opacity-50" : "cursor-pointer",
       )}
     >

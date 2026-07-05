@@ -5,13 +5,11 @@
 // remaining tabs reuse the existing tool components with the same props the
 // old /tools/[tool] page passed them. The active tab persists in the URL hash.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowLeft, BookOpen } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BookOpen, ShieldCheck } from "lucide-react";
 import { adaptersApi } from "@/lib/api-adapters";
-import type {
-  AdapterMeta, AdapterSummary, ConnectionEventRow, ConnectionRow,
-} from "@/lib/adapters/types";
+import type { AdapterMeta, AdapterSummary, ConnectionRow } from "@/lib/adapters/types";
 import type { EndpointView } from "@/lib/tools/registry";
 import type { AuthType } from "@/lib/tools/types";
 import { categoryLabel } from "@/lib/tools/categories";
@@ -48,13 +46,20 @@ function isTab(v: string): v is TabId {
   return (TAB_IDS as readonly string[]).includes(v);
 }
 
+/** The slice of the /api/adapters/[tool] response this page consumes. */
 interface DetailData {
   reachable: boolean;
   adapter: AdapterSummary;
-  meta: AdapterMeta;
   connections: ConnectionRow[];
-  recentEvents: ConnectionEventRow[];
 }
+
+const AUTH_LABEL: Record<AuthType, string> = {
+  api_key_header: "API key (header)",
+  api_key_query: "API key (query)",
+  bearer: "Bearer token",
+  basic: "Basic auth",
+  none: "No auth",
+};
 
 export interface AdapterDetailProps {
   toolId: string;
@@ -68,10 +73,12 @@ export interface AdapterDetailProps {
   endpoints: EndpointView[];
   meta: AdapterMeta;
   serverless: boolean;
+  /** Connection CRUD is admin-only server-side — gates those affordances. */
+  isAdmin: boolean;
 }
 
 export function AdapterDetail({
-  toolId, name, vendor, blurb, docsUrl, auth, basePath, baseUrl, endpoints, meta, serverless,
+  toolId, name, vendor, blurb, docsUrl, auth, basePath, baseUrl, endpoints, meta, serverless, isAdmin,
 }: AdapterDetailProps) {
   const [tab, setTab] = useState<TabId>("connections");
   const [data, setData] = useState<DetailData | null>(null);
@@ -92,14 +99,21 @@ export function AdapterDetail({
     window.history.replaceState(null, "", `#${t}`);
   }, []);
 
-  const load = useCallback(
-    () => adaptersApi.get(toolId).then(setData).catch(() => { /* transient error: keep last state, retry on next poll */ }),
-    [toolId],
-  );
+  // Monotonic sequence so a slow in-flight poll can never overwrite the fresher
+  // state a mutation-triggered reload just wrote.
+  const seq = useRef(0);
+  const load = useCallback(() => {
+    const mine = ++seq.current;
+    return adaptersApi
+      .get(toolId)
+      .then((d) => { if (mine === seq.current) setData(d); })
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
+  }, [toolId]);
 
   useEffect(() => {
     load();
-    const id = setInterval(load, POLL_MS);
+    // Skip ticks while the tab is hidden — one poll after re-focus catches up.
+    const id = setInterval(() => { if (!document.hidden) load(); }, POLL_MS);
     return () => clearInterval(id);
   }, [load]);
 
@@ -162,6 +176,9 @@ export function AdapterDetail({
               <BookOpen size={12} /> Vendor docs
             </a>
           ) : null}
+          <span className="chip" title="Authentication scheme">
+            <ShieldCheck size={12} /> {AUTH_LABEL[auth.type]}{auth.param ? ` | ${auth.param}` : ""}
+          </span>
           <span className="chip tnum">{endpoints.length} endpoints</span>
           {adapter ? <span className="chip tnum">{adapter.connectionCount} connection{adapter.connectionCount === 1 ? "" : "s"}</span> : null}
           {data && !data.reachable ? (
@@ -201,6 +218,7 @@ export function AdapterDetail({
           meta={meta}
           connections={data ? connections : null}
           reachable={reachable}
+          isAdmin={isAdmin}
           onChanged={load}
         />
       ) : null}

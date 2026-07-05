@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Boxes, PlugZap, Search, X } from "lucide-react";
 import { adaptersApi } from "@/lib/api-adapters";
 import type { AdapterSummary, ConnectionStatus } from "@/lib/adapters/types";
@@ -28,14 +28,20 @@ export function AdaptersCatalog({ initialCategory }: { initialCategory?: string 
   );
   const [configuredOnly, setConfiguredOnly] = useState(false);
 
-  const load = useCallback(
-    () => adaptersApi.list().then(setData).catch(() => { /* transient error: keep last state, retry on next poll */ }),
-    [],
-  );
+  // Sequence guard: a slow stale response never overwrites a fresher one.
+  const seq = useRef(0);
+  const load = useCallback(() => {
+    const mine = ++seq.current;
+    return adaptersApi
+      .list()
+      .then((d) => { if (mine === seq.current) setData(d); })
+      .catch(() => { /* transient error: keep last state, retry on next poll */ });
+  }, []);
 
   useEffect(() => {
     load();
-    const id = setInterval(load, REFRESH_MS);
+    // Skip ticks while the tab is hidden — one poll after re-focus catches up.
+    const id = setInterval(() => { if (!document.hidden) load(); }, REFRESH_MS);
     return () => clearInterval(id);
   }, [load]);
 

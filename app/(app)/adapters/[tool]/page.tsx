@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 import { getTool, endpointViews, basePath } from "@/lib/tools/registry";
 import { getBaseUrl } from "@/lib/base-url";
 import { isServerless } from "@/lib/db";
-import { adapterMeta } from "@/lib/adapters/meta";
-import type { AdapterMeta } from "@/lib/adapters/types";
+import { requireUser } from "@/lib/auth/current";
+import { metaOrFallback } from "@/lib/adapters/connections";
 import { AdapterDetail } from "@/components/adapters/AdapterDetail";
 
 export const dynamic = "force-dynamic";
@@ -12,20 +12,12 @@ export const dynamic = "force-dynamic";
 // chrome server-side; live connection data streams in client-side through
 // lib/api-adapters. The old /tools/[tool] tabs (endpoints console, events,
 // automation, state, keys, logs) are absorbed as tabs here.
-export default function AdapterDetailPage({ params }: { params: { tool: string } }) {
+export default async function AdapterDetailPage({ params }: { params: { tool: string } }) {
+  const user = await requireUser();
   const tool = getTool(params.tool);
   if (!tool) notFound();
 
-  // Fallback mirrors the API's metaOrFallback for tools without meta entries.
-  const meta: AdapterMeta = adapterMeta(tool.id) ?? {
-    toolId: tool.id,
-    blurb: tool.summary,
-    categories: [tool.category],
-    assetTypes: [],
-    connectionParams: [],
-    fetchSteps: [],
-    heartbeat: { operation: tool.endpoints[0]?.operation ?? "unknown" },
-  };
+  const meta = metaOrFallback(tool); // same fallback the API layer uses
 
   return (
     <AdapterDetail
@@ -40,6 +32,7 @@ export default function AdapterDetailPage({ params }: { params: { tool: string }
       endpoints={endpointViews(tool)}
       meta={meta}
       serverless={isServerless()}
+      isAdmin={user.role === "administrator"}
     />
   );
 }
