@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { TOOLS, toolCount, endpointCount, aiToolCount } from "@/lib/tools/registry";
+import { TOOLS, toolCount, endpointCount } from "@/lib/tools/registry";
 import { CATEGORIES } from "@/lib/tools/categories";
 import { PageHeader } from "@/components/PageHeader";
 import { Panel } from "@/components/ui";
 import { CategoryIcon } from "@/lib/icons";
 import { OverviewStats } from "@/components/overview/OverviewStats";
+import { DiscoveryActivity } from "@/components/overview/DiscoveryActivity";
 import { RecentActivity } from "@/components/overview/RecentActivity";
 import { GettingStarted } from "@/components/overview/GettingStarted";
 import { getBaseUrl } from "@/lib/base-url";
@@ -23,44 +24,45 @@ export default function OverviewPage() {
       <PageHeader
         eyebrow="Overview"
         title="Client Tool Emulator"
-        description="A sandbox that stands in for the cybersecurity tools a client runs - so agent workflows can be exercised against realistic, logged mock APIs instead of production systems."
+        description="An adapter platform over hand-crafted mock security tools: credentialed connections with a live lifecycle, scheduled discovery fetches, a correlated asset inventory and one gateway URL per connection - so agent workflows run against realistic, logged APIs instead of production systems."
+        actions={<Link href="/adapters" className="btn-primary">Open adapters <ArrowRight size={13} /></Link>}
       />
 
-      <OverviewStats catalogFallback={{ tools: toolCount(), endpoints: endpointCount(), aiTools: aiToolCount() }} />
+      <OverviewStats catalogFallback={{ adapters: toolCount(), endpoints: endpointCount() }} />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <DiscoveryActivity />
+        </div>
+        <GettingStarted baseUrl={baseUrl} />
+      </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <RecentActivity />
         </div>
-        <GettingStarted baseUrl={baseUrl} />
-      </div>
-
-      <Panel
-        title="Browse by Category"
-        className="mt-4"
-        actions={<Link href="/tools" className="btn-ghost">All tools <ArrowRight size={13} /></Link>}
-      >
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {counts.map((c) => (
-            <Link
-              key={c.id}
-              href={`/tools?category=${c.id}`}
-              className="group flex items-start gap-3 border border-border bg-sunk p-3 transition-colors hover:border-accent hover:bg-surface-hover"
-            >
-              <span className="grid h-8 w-8 shrink-0 place-items-center border border-hair bg-surface text-accent-fg">
-                <CategoryIcon id={c.id} size={15} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-[12.5px] font-bold">{c.label}</span>
-                  <span className="chip tabular-nums ml-auto shrink-0">{c.count}</span>
+        <Panel
+          title="Browse by category"
+          noPadding
+          actions={<Link href="/adapters" className="btn-ghost">All adapters <ArrowRight size={13} /></Link>}
+        >
+          <div className="p-2">
+            {counts.map((c) => (
+              <Link
+                key={c.id}
+                href={`/adapters?category=${c.id}`}
+                className="rowlink flex items-center gap-3 rounded px-3 py-2"
+              >
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-sm border border-hair bg-sunk text-accent-fg">
+                  <CategoryIcon id={c.id} size={14} />
                 </span>
-                <span className="mt-1 line-clamp-2 block text-[11px] leading-relaxed text-text3">{c.blurb}</span>
-              </span>
-            </Link>
-          ))}
-        </div>
-      </Panel>
+                <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold">{c.label}</span>
+                <span className="chip tnum shrink-0">{c.count}</span>
+              </Link>
+            ))}
+          </div>
+        </Panel>
+      </div>
     </div>
   );
 }
