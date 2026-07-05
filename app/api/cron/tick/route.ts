@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runDueGenerators } from "@/lib/engine/scheduler";
+import { runDueHeartbeats } from "@/lib/adapters/heartbeat";
+import { runDueFetches } from "@/lib/adapters/fetch-scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +20,14 @@ function authorized(req: NextRequest): boolean {
 
 async function handle(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
-  const result = await runDueGenerators();
-  return NextResponse.json({ ok: true, ...result });
+  // One tick drives all DB-coordinated cycles; each runner claims its own due
+  // rows atomically, so overlapping cron calls stay exactly-once.
+  const [generators, heartbeats, fetches] = await Promise.all([
+    runDueGenerators(),
+    runDueHeartbeats().catch(() => ({ checked: 0, ran: 0, transitions: 0 })),
+    runDueFetches().catch(() => ({ checked: 0, started: 0 })),
+  ]);
+  return NextResponse.json({ ok: true, generators, heartbeats, fetches });
 }
 
 export const GET = handle;
