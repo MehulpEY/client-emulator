@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-/** HTTP method pill - colour-coded, monospace, squared. */
+/** HTTP method pill - colour-coded, monospace, soft radius. */
 const METHOD_TONE: Record<string, string> = {
   GET: "text-info border-info-line bg-info-bg",
   POST: "text-ok border-ok-line bg-ok-bg",
@@ -14,7 +14,7 @@ export function MethodBadge({ method, className }: { method: string; className?:
   return (
     <span
       className={cn(
-        "mono inline-flex h-5 items-center border px-1.5 text-[10.5px] font-bold tracking-wide",
+        "mono inline-flex h-5 items-center rounded-sm border px-1.5 text-[11px] font-semibold tracking-wide",
         METHOD_TONE[m] || "text-text2 border-border bg-surface-sunk",
         className
       )}
@@ -32,15 +32,15 @@ export function StatusBadge({ status, className }: { status: number; className?:
     : status >= 200 && status < 300 ? "text-ok border-ok-line bg-ok-bg"
     : "text-text2 border-border bg-surface-sunk";
   return (
-    <span className={cn("mono inline-flex h-5 items-center border px-1.5 text-[10.5px] font-bold tnum", tone, className)}>
+    <span className={cn("mono inline-flex h-5 items-center rounded-sm border px-1.5 text-[11px] font-semibold tnum", tone, className)}>
       {status}
     </span>
   );
 }
 
-/** Small uppercase tag for a tool category. */
+/** Small sentence-case tag for a tool category. */
 export function Tag({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className={cn("chip text-[10px] uppercase tracking-[0.06em]", className)}>{children}</span>
+    <span className={cn("chip text-[11px]", className)}>{children}</span>
   );
 }

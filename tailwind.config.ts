@@ -6,10 +6,12 @@ import type { Config } from "tailwindcss";
  * `[data-theme="dark"]`). The CSS vars are the single source of truth; this
  * file only exposes them to Tailwind's utility generator.
  *
- * Doctrine (shared with the reference design system): enterprise /
- * "confident" - squared (the radius scale is zeroed so every `rounded-*` is
- * sharp), flat, hairline borders, electric-yellow accent, Arial type. Depth
- * comes from the glass/aurora/glow primitives in `globals.css`, not rounding.
+ * Doctrine (shared with the reference design system): calm-enterprise,
+ * readable - Inter type (via next/font `--font-sans`), soft radii
+ * (xs 4 / sm 6 / DEFAULT 8 / md 10 / lg 12 / xl 16 / full pill), hairline
+ * borders, electric-yellow accent. Depth comes from borders + the 1px glass
+ * inset in `globals.css`; outer drop shadows are reserved for overlays
+ * (popovers / modals).
  */
 const config: Config = {
   darkMode: ["selector", '[data-theme="dark"]'],
@@ -60,19 +62,20 @@ const config: Config = {
         line: "var(--border)",
       },
       fontFamily: {
-        sans: ["Arial", '"Helvetica Neue"', "Helvetica", '"Liberation Sans"', "sans-serif"],
-        mono: ['"SFMono-Regular"', '"SF Mono"', "Menlo", "Consolas", '"Liberation Mono"', "monospace"],
+        sans: ["var(--font-sans)", "Arial", '"Helvetica Neue"', "Helvetica", '"Liberation Sans"', "sans-serif"],
+        mono: ["var(--font-mono)", '"SFMono-Regular"', '"SF Mono"', "Menlo", "Consolas", '"Liberation Mono"', "monospace"],
       },
       borderRadius: {
-        none: "0", sm: "0", DEFAULT: "0", md: "0", lg: "0", xl: "0", "2xl": "0", "3xl": "0", full: "9999px",
+        none: "0", xs: "4px", sm: "6px", DEFAULT: "8px", md: "10px", lg: "12px", xl: "16px", "2xl": "20px", "3xl": "24px", full: "9999px",
       },
       screens: {
         "3xl": "1920px",
         "4xl": "2560px",
       },
       boxShadow: {
-        panel: "0 18px 50px -30px rgba(0,0,0,0.55)",
-        glow: "0 0 0 1px var(--accent-glow), 0 18px 60px -22px rgba(255,230,0,0.35)",
+        // Panels carry no outer drop shadow - border + inset only.
+        panel: "inset 0 1px 0 0 var(--glass-inset)",
+        glow: "0 0 0 1px var(--accent-glow)",
         pop: "0 12px 32px -12px rgba(0,0,0,0.45)",
       },
     },

@@ -61,15 +61,15 @@ export function Modal({ open, onClose, title, icon, children, footer, size = "md
           <header className="panel-head shrink-0">
             <div className="flex min-w-0 items-center gap-2">
               {icon ? <span className="shrink-0 text-accent-fg">{icon}</span> : null}
-              {typeof title === "string" ? <h2 className="truncate text-[13px] font-bold">{title}</h2> : title}
+              {typeof title === "string" ? <h2 className="truncate text-[14px] font-semibold">{title}</h2> : title}
             </div>
             {dismissable ? (
               <button onClick={onClose} className="btn-ghost h-7 w-7 !px-0" aria-label="Close"><X size={14} /></button>
             ) : null}
           </header>
         )}
-        <div className="emu-scroll min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
-        {footer ? <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-hair px-4 py-3">{footer}</footer> : null}
+        <div className="emu-scroll min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        {footer ? <footer className="flex shrink-0 items-center justify-end gap-2 border-t border-hair px-5 py-3">{footer}</footer> : null}
       </div>
     </div>,
     document.body,

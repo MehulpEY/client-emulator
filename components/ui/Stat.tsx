@@ -24,13 +24,13 @@ export function Stat({
   className?: string;
 }) {
   return (
-    <div className={cn("panel p-4", className)}>
+    <div className={cn("panel p-5", className)}>
       <div className="flex items-start justify-between gap-2">
         <div className="label">{label}</div>
         {icon ? <span className="text-text3">{icon}</span> : null}
       </div>
-      <div className={cn("mt-2 text-[26px] font-bold leading-none tnum", TONE[tone])}>{value}</div>
-      {sub ? <div className="mt-1.5 text-[11.5px] text-text2">{sub}</div> : null}
+      <div className={cn("mt-2 text-[26px] font-semibold leading-none tnum", TONE[tone])}>{value}</div>
+      {sub ? <div className="mt-1.5 text-[12px] text-text2">{sub}</div> : null}
     </div>
   );
 }
