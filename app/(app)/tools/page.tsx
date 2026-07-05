@@ -1,19 +1,13 @@
-import { allSummaries } from "@/lib/tools/registry";
-import { PageHeader } from "@/components/PageHeader";
-import { CatalogClient } from "@/components/tools/CatalogClient";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function ToolsPage({ searchParams }: { searchParams: { category?: string } }) {
-  const tools = allSummaries();
-  return (
-    <div>
-      <PageHeader
-        eyebrow="Catalog"
-        title="Emulated Tools"
-        description="Every tool the client might run, mocked behind a stable API. Open one to see its endpoints, try a live call, and watch the request trace."
-      />
-      <CatalogClient tools={tools} initialCategory={searchParams.category} />
-    </div>
+// The tool catalog became the adapters catalog (PLAN §4.7 / §6 W7) — keep old
+// links and bookmarks working, category filter included.
+export default function ToolsRedirect({ searchParams }: { searchParams: { category?: string } }) {
+  redirect(
+    searchParams.category
+      ? `/adapters?category=${encodeURIComponent(searchParams.category)}`
+      : "/adapters",
   );
 }
