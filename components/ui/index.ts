@@ -14,7 +14,7 @@ export type { StatTone } from "./Stat";
 
 export { MethodBadge, StatusBadge, Tag } from "./Badges";
 
-export { Skeleton, SkeletonText, SkeletonCards, SkeletonRows, SkeletonPanel, SkeletonStats } from "./Skeleton";
+export { Skeleton, SkeletonText, SkeletonCards, SkeletonRows, SkeletonPanel, SkeletonStats, SkeletonHeader } from "./Skeleton";
 
 export { Spinner, SectionLabel, Eyebrow, SpectrumLine, EmptyState } from "./Feedback";
 
