@@ -67,6 +67,23 @@ export function SkeletonPanel({ className = "", lines = 4 }: { className?: strin
   );
 }
 
+/** Placeholder that mirrors <PageHeader/> (eyebrow, title, description). Used by
+    route-level loading.tsx files so the header lands in place while the page and
+    its client bundle load. */
+export function SkeletonHeader({ lines = 2 }: { lines?: number }) {
+  return (
+    <div className="mb-5">
+      <Skeleton className="h-3 w-20" />
+      <Skeleton className="mt-2 h-7 w-52" />
+      <div className="mt-2 max-w-2xl space-y-1.5">
+        {Array.from({ length: lines }).map((_, i) => (
+          <Skeleton key={i} className={cn("h-3", i === lines - 1 ? "w-2/5" : "w-full")} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Row of stat-card placeholders for the overview header. */
 export function SkeletonStats({ count = 4 }: { count?: number }) {
   return (
