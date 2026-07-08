@@ -7,10 +7,11 @@ import { SESSION_COOKIE, verifySession } from "@/lib/auth/session";
 // again server-side in each route handler / layout (against the DB), so a
 // bypass here alone can't grant access - defense in depth.
 
-const PUBLIC_PAGES = ["/login", "/setup", "/accept-invite", "/forgot-password", "/reset-password"];
+const PUBLIC_PAGES = ["/login", "/setup", "/accept-invite", "/forgot-password", "/reset-password", "/architecture"];
 
 function isPublic(pathname: string): boolean {
   if (pathname === "/") return true; // public landing (authed visitors are bounced to /overview by the page)
+  if (pathname === "/architecture") return true; // public architecture reference (readable signed-in or not)
   if (pathname.startsWith("/api/auth/")) return true; // login / setup / accept-invite / forgot / reset / logout
   if (pathname.startsWith("/api/mock/")) return true; // agents authenticate with per-tool API keys
   if (pathname.startsWith("/api/gateway/")) return true; // singular endpoint: the connection embodies the credential

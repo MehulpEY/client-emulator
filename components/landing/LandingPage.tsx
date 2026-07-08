@@ -137,7 +137,7 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
                 Sign in <ArrowRight size={14} />
               </Link>
               <a href="#how-it-works" className="btn-ghost h-10 px-5 text-[13px]">See how it works</a>
-              <span className="text-[12px] text-text3">Invitation-only access</span>
+              <Link href="/architecture" className="text-[12px] text-text3 underline-offset-2 transition-colors hover:text-accent-fg hover:underline">Read the architecture</Link>
             </motion.div>
           </motion.div>
 
@@ -255,7 +255,7 @@ export function LandingPage({ stats }: { stats: LandingStats }) {
             </motion.div>
             <motion.div variants={item} className="flex shrink-0 items-center gap-3">
               <Link href="/login" className="btn-primary h-10 px-5 text-[13px]"><LogIn size={14} /> Sign in</Link>
-              <a href="https://github.com/MehulpEY/client-emulator" target="_blank" rel="noreferrer" className="btn-ghost h-10 px-5 text-[13px]">Documentation</a>
+              <Link href="/architecture" className="btn-ghost h-10 px-5 text-[13px]">Architecture</Link>
             </motion.div>
           </Reveal>
         </section>
