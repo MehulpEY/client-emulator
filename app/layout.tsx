@@ -1,12 +1,26 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ConfirmProvider } from "@/components/ui";
 
-// Self-hosted via next/font (no runtime CDN request). The CSS variables are
-// consumed by globals.css / tailwind.config.ts as the sans + mono stacks.
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono", display: "swap" });
+// Fonts are self-hosted from bundled files (app/fonts) via next/font/local, so
+// neither dev nor build ever reaches out to Google Fonts. This avoids the
+// "Retrying.../The user aborted a request." download failures on networks that
+// block or throttle fonts.gstatic.com. Both are latin variable fonts (one file
+// covers the full weight range). The CSS variables are consumed by globals.css /
+// tailwind.config.ts as the sans + mono stacks.
+const inter = localFont({
+  src: "./fonts/Inter-latin-var.woff2",
+  variable: "--font-sans",
+  display: "swap",
+  weight: "100 900",
+});
+const jetbrainsMono = localFont({
+  src: "./fonts/JetBrainsMono-latin-var.woff2",
+  variable: "--font-mono",
+  display: "swap",
+  weight: "100 800",
+});
 
 export const metadata: Metadata = {
   title: "Client Emulator - Tool Sandbox",
