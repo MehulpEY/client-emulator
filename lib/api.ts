@@ -46,6 +46,7 @@ export const api = {
   clearLogs: (tool?: string) => j<{ ok: boolean; deleted: number }>(`/api/logs${tool ? "?tool=" + encodeURIComponent(tool) : ""}`, { method: "DELETE" }),
   keys: (tool?: string) => j<{ reachable: boolean; keys: ApiKeyRow[] }>(`/api/keys${tool ? "?tool=" + encodeURIComponent(tool) : ""}`),
   createKey: (body: { tool_id?: string | null; label?: string }) => j<{ ok: boolean; key: ApiKeyRow }>("/api/keys", post(body)),
+  deleteKey: (keyId: string) => jr<{ ok: boolean; deleted?: number; error?: string }>(`/api/keys?id=${encodeURIComponent(keyId)}`, { method: "DELETE" }),
 
   // -- pub/sub --------------------------------------------------------------
   subscriptions: (tool?: string) => j<{ reachable: boolean; subscriptions: SubscriptionRow[] }>(`/api/subscriptions${tool ? "?tool=" + encodeURIComponent(tool) : ""}`),

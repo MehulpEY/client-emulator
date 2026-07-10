@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, Plus } from "lucide-react";
+import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ApiKeyRow } from "@/lib/types";
-import { Panel, SkeletonRows, EmptyState, Spinner, CopyButton, Chip } from "@/components/ui";
+import { Panel, SkeletonRows, EmptyState, Spinner, CopyButton, Chip, useConfirm } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 
 export function KeysClient({ tools }: { tools: { id: string; name: string }[] }) {
+  const confirm = useConfirm();
   const [keys, setKeys] = useState<ApiKeyRow[] | null>(null);
   const [reachable, setReachable] = useState(true);
   const [toolId, setToolId] = useState("");
   const [label, setLabel] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const nameOf = (id: string | null) => (id ? tools.find((t) => t.id === id)?.name || id : "Master (all tools)");
 
@@ -30,6 +33,34 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
       setLabel("");
       await load();
     } finally { setCreating(false); }
+  }
+
+  async function remove(k: ApiKeyRow) {
+    const scope = k.tool_id === null ? "the master key" : `the ${nameOf(k.tool_id)} key`;
+    const ok = await confirm({
+      title: "Delete key",
+      message: (
+        <>
+          Delete <span className="font-semibold text-text">{scope}</span> (<span className="mono">{k.label}</span>)?
+          Any agent still presenting it will start getting 401s. If this is the last key for a tool, that tool reopens
+          to unauthenticated calls.
+        </>
+      ),
+      confirmLabel: "Delete key",
+      danger: true,
+    });
+    if (!ok) return;
+    setError(null);
+    setDeleting(k.key_id);
+    try {
+      const r = await api.deleteKey(k.key_id);
+      if (!r.ok) setError(r.error ?? "Delete failed");
+      await load();
+    } catch {
+      setError("Delete failed — request error");
+    } finally {
+      setDeleting(null);
+    }
   }
 
   return (
@@ -56,10 +87,21 @@ export function KeysClient({ tools }: { tools: { id: string; name: string }[] })
                 </div>
                 <span className="hidden shrink-0 text-[11px] text-text3 sm:block">{relativeTime(k.created_at)}</span>
                 <CopyButton value={k.secret} className="h-7 w-7 shrink-0 !px-0" />
+                <button
+                  className="btn-danger h-7 w-7 shrink-0 !px-0"
+                  title="Delete key"
+                  onClick={() => remove(k)}
+                  disabled={deleting === k.key_id}
+                >
+                  {deleting === k.key_id ? <Spinner className="!text-[10px]" /> : <Trash2 size={13} />}
+                </button>
               </div>
             ))}
           </div>
         )}
+        {error ? (
+          <div className="border-t border-danger-line bg-danger-bg px-4 py-2 text-[12px] text-danger">{error}</div>
+        ) : null}
       </Panel>
 
       <Panel title="Issue a Key" icon={<Plus size={14} />}>

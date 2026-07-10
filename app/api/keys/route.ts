@@ -42,3 +42,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: err?.message ?? "insert failed" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  const auth = await requireApiAdmin();
+  if ("res" in auth) return auth.res;
+  if (!dbAvailable()) return NextResponse.json({ ok: false, error: "database unreachable" }, { status: 503 });
+  const keyId = req.nextUrl.searchParams.get("id");
+  if (!keyId) return NextResponse.json({ ok: false, error: "missing key id" }, { status: 400 });
+  try {
+    const rows = await q<{ key_id: string }>(
+      `delete from ${SCHEMA}.api_keys where key_id = $1 returning key_id`,
+      [keyId]
+    );
+    if (rows.length === 0) return NextResponse.json({ ok: false, error: "unknown key" }, { status: 404 });
+    // A removed key changes which tools are gated (dropping the last key for a
+    // tool reopens it), so refresh the engine's cached auth view.
+    invalidateRuntimeCache();
+    return NextResponse.json({ ok: true, deleted: rows.length });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: err?.message ?? "delete failed" }, { status: 500 });
+  }
+}

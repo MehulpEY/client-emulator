@@ -5,19 +5,47 @@
 // panel AND the header rollup); every mutation here calls onChanged() to
 // refresh immediately.
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  Database, DownloadCloud, FlaskConical, Pencil, PlugZap, Plus, StickyNote, Trash2,
+  Database, DownloadCloud, FlaskConical, Pencil, PlugZap, Plus, StickyNote, Terminal, Trash2,
 } from "lucide-react";
 import { adaptersApi } from "@/lib/api-adapters";
 import type { AdapterMeta, ConnectionRow } from "@/lib/adapters/types";
-import { Chip, EmptyState, Panel, SkeletonRows, Spinner, useConfirm, type ChipVariant } from "@/components/ui";
+import type { EndpointView } from "@/lib/tools/registry";
+import { Chip, CopyButton, EmptyState, Panel, SkeletonRows, Spinner, useConfirm, type ChipVariant } from "@/components/ui";
 import { relativeTime } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import { AddConnectionModal } from "./AddConnectionModal";
 import { absTime, fmtInt, formatMs, sessionReusePct, SIMULATE_META, STATUS_CHIP, Th } from "./shared";
 
 type RowAction = "test" | "fetch" | "toggle" | "delete";
+
+/**
+ * A representative call for the "how to use this connection" example — the same
+ * endpoint the server's gateway descriptor picks (heartbeat op, else first GET).
+ * Path params are filled from the heartbeat spec so the example is runnable.
+ */
+interface GatewaySample {
+  method: string;
+  path: string;
+  query: string;
+  body?: string;
+}
+function buildGatewaySample(meta: AdapterMeta, endpoints: EndpointView[]): GatewaySample | null {
+  const hb = meta.heartbeat;
+  const chosen =
+    (hb ? endpoints.find((e) => e.operation === hb.operation) : undefined) ??
+    endpoints.find((e) => e.method === "GET") ??
+    endpoints[0];
+  if (!chosen) return null;
+  const usedHb = hb && chosen.operation === hb.operation;
+  const path = chosen.path.replace(/\{(\w+)\}/g, (_, name) =>
+    encodeURIComponent((usedHb ? hb!.pathParams?.[name] : undefined) ?? `emu-${name}`),
+  );
+  const query = usedHb && hb!.query ? new URLSearchParams(hb!.query).toString() : "";
+  const body = chosen.method !== "GET" && chosen.request !== undefined ? JSON.stringify(chosen.request) : undefined;
+  return { method: chosen.method, path, query, body };
+}
 
 type NoteTone = "ok" | "warn" | "danger" | "info";
 
@@ -39,18 +67,24 @@ interface Props {
   reachable: boolean;
   /** Create/edit/delete/toggle are admin-only server-side. */
   isAdmin: boolean;
+  /** App origin, for the copyable gateway example. */
+  baseUrl: string;
+  /** Adapter endpoints, for the "how to use" example call. */
+  endpoints: EndpointView[];
   onChanged: () => Promise<void> | void;
 }
 
 const ADMIN_ONLY = "Administrator role required";
 
-export function ConnectionsPanel({ toolId, toolName, meta, connections, reachable, isAdmin, onChanged }: Props) {
+export function ConnectionsPanel({ toolId, toolName, meta, connections, reachable, isAdmin, baseUrl, endpoints, onChanged }: Props) {
   const confirm = useConfirm();
   const [modal, setModal] = useState<{ connection?: ConnectionRow } | null>(null);
   const [busy, setBusy] = useState<{ id: string; action: RowAction } | null>(null);
   const [note, setNote] = useState<RowNote | null>(null);
+  const [usageId, setUsageId] = useState<string | null>(null);
 
   const canFetch = meta.fetchSteps.length > 0;
+  const sample = useMemo(() => buildGatewaySample(meta, endpoints), [meta, endpoints]);
 
   async function doTest(c: ConnectionRow) {
     setBusy({ id: c.connectionId, action: "test" });
@@ -193,11 +227,14 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
                       rowBusy={rowBusy}
                       busyAction={rowBusy ? busy!.action : null}
                       note={note?.id === c.connectionId ? note : null}
+                      usageOpen={usageId === c.connectionId}
+                      usage={sample ? { baseUrl, sample } : null}
                       onTest={() => doTest(c)}
                       onFetch={() => doFetch(c)}
                       onToggle={() => doToggle(c)}
                       onEdit={() => setModal({ connection: c })}
                       onDelete={() => doDelete(c)}
+                      onUsage={() => setUsageId((id) => (id === c.connectionId ? null : c.connectionId))}
                       onDismissNote={() => setNote(null)}
                     />
                   );
@@ -223,8 +260,8 @@ export function ConnectionsPanel({ toolId, toolName, meta, connections, reachabl
 }
 
 function ConnRow({
-  c, canFetch, canManage, rowBusy, busyAction, note,
-  onTest, onFetch, onToggle, onEdit, onDelete, onDismissNote,
+  c, canFetch, canManage, rowBusy, busyAction, note, usageOpen, usage,
+  onTest, onFetch, onToggle, onEdit, onDelete, onUsage, onDismissNote,
 }: {
   c: ConnectionRow;
   canFetch: boolean;
@@ -232,11 +269,14 @@ function ConnRow({
   rowBusy: boolean;
   busyAction: RowAction | null;
   note: RowNote | null;
+  usageOpen: boolean;
+  usage: { baseUrl: string; sample: GatewaySample } | null;
   onTest: () => void;
   onFetch: () => void;
   onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onUsage: () => void;
   onDismissNote: () => void;
 }) {
   const disabledConn = !c.enabled || c.status === "disabled";
@@ -285,6 +325,15 @@ function ConnRow({
         </td>
         <td className="whitespace-nowrap px-4 py-2.5">
           <div className="flex items-center justify-end gap-1">
+            {usage ? (
+              <IconBtn
+                title={usageOpen ? "Hide usage" : "How to call this connection"}
+                onClick={onUsage}
+                active={usageOpen}
+              >
+                <Terminal size={13} />
+              </IconBtn>
+            ) : null}
             <IconBtn
               title={disabledConn ? "Enable the connection to test it" : "Test now — runs a real heartbeat"}
               onClick={onTest}
@@ -316,6 +365,13 @@ function ConnRow({
           </div>
         </td>
       </tr>
+      {usageOpen && usage ? (
+        <tr className="border-b border-hair last:border-0">
+          <td colSpan={8} className="px-4 pb-3 pt-0">
+            <UsageBlock connectionId={c.connectionId} baseUrl={usage.baseUrl} sample={usage.sample} disabledConn={disabledConn} />
+          </td>
+        </tr>
+      ) : null}
       {note ? (
         <tr className="border-b border-hair last:border-0">
           <td colSpan={8} className="px-4 pb-2.5 pt-0">
@@ -369,7 +425,7 @@ function Switch({ checked, onChange, disabled, label }: { checked: boolean; onCh
 }
 
 function IconBtn({
-  children, title, onClick, disabled, busy, danger,
+  children, title, onClick, disabled, busy, danger, active,
 }: {
   children: ReactNode;
   title: string;
@@ -377,15 +433,65 @@ function IconBtn({
   disabled?: boolean;
   busy?: boolean;
   danger?: boolean;
+  active?: boolean;
 }) {
   return (
     <button
-      className={cn(danger ? "btn-danger" : "btn-ghost", "h-7 w-7 !px-0")}
+      className={cn(danger ? "btn-danger" : "btn-ghost", "h-7 w-7 !px-0", active && "border-accent !bg-accent-soft !text-accent-fg")}
       title={title}
       onClick={onClick}
       disabled={disabled}
     >
       {busy ? <Spinner className="!text-[10px]" /> : children}
     </button>
+  );
+}
+
+/**
+ * "How to call this connection" — the gateway URL is the stable, secret-free
+ * handle an agent uses; the connection injects its own credential, session and
+ * config, so no API key is sent. Append any endpoint path to the base URL.
+ */
+function UsageBlock({
+  connectionId, baseUrl, sample, disabledConn,
+}: {
+  connectionId: string;
+  baseUrl: string;
+  sample: GatewaySample;
+  disabledConn: boolean;
+}) {
+  const gatewayBase = `${baseUrl}/api/gateway/${connectionId}`;
+  const qs = sample.query ? `?${sample.query}` : "";
+  const url = `${gatewayBase}${sample.path}${qs}`;
+  const curl =
+    sample.method === "GET"
+      ? `curl -s "${url}"`
+      : `curl -s -X ${sample.method} "${url}" -H "content-type: application/json"${sample.body ? ` -d '${sample.body}'` : ""}`;
+
+  return (
+    <div className="rounded-md border border-hair bg-surface-sunk p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Terminal size={13} className="text-accent-fg" />
+        <span className="text-[12px] font-semibold">Call this connection</span>
+        {disabledConn ? <Chip variant="warn">enable it first</Chip> : null}
+      </div>
+      <p className="mb-2.5 text-[11.5px] leading-relaxed text-text3">
+        This is the connection&apos;s gateway URL — the stable handle an agent uses. It injects this connection&apos;s
+        credential, session and config, so you send <span className="font-semibold text-text2">no API key</span>. Append
+        any endpoint path to the base URL.
+      </p>
+
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="label">Gateway base URL</span>
+        <CopyButton value={gatewayBase} label="Copy" className="h-6 !text-[11px]" />
+      </div>
+      <pre className="emu-scroll mono mb-2.5 overflow-x-auto rounded bg-surface p-2.5 text-[11px] leading-relaxed text-text2">{gatewayBase}</pre>
+
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="label">Example request ({sample.method})</span>
+        <CopyButton value={curl} label="Copy curl" className="h-6 !text-[11px]" />
+      </div>
+      <pre className="emu-scroll mono overflow-x-auto rounded bg-surface p-2.5 text-[11px] leading-relaxed text-text2">{curl}</pre>
+    </div>
   );
 }
