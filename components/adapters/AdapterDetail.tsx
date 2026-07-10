@@ -24,7 +24,8 @@ import { ToolLogs } from "@/components/tools/ToolLogs";
 import { cn } from "@/lib/cn";
 import { ConnectionsPanel } from "./ConnectionsPanel";
 import { FetchHistoryPanel } from "./FetchHistoryPanel";
-import { ASSET_TYPE_LABEL, fmtInt, MonogramTile, StatusDots } from "./shared";
+import { ASSET_TYPE_LABEL, fmtInt, StatusDots } from "./shared";
+import { BrandLogo } from "@/components/BrandLogo";
 
 const POLL_MS = 5000;
 
@@ -130,7 +131,7 @@ export function AdapterDetail({
       {/* Header */}
       <div className="panel mb-4 p-5">
         <div className="flex flex-wrap items-start gap-4">
-          <MonogramTile name={name} className="h-12 w-12 rounded-lg text-[16px]" />
+          <BrandLogo toolId={toolId} name={name} size={48} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[22px] font-bold tracking-[-0.01em]">{name}</h1>
@@ -219,6 +220,8 @@ export function AdapterDetail({
           connections={data ? connections : null}
           reachable={reachable}
           isAdmin={isAdmin}
+          baseUrl={baseUrl}
+          endpoints={endpoints}
           onChanged={load}
         />
       ) : null}

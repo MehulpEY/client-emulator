@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { AdapterSummary } from "@/lib/adapters/types";
 import { categoryLabel } from "@/lib/tools/categories";
 import { Chip } from "@/components/ui";
-import { ASSET_TYPE_LABEL, fmtInt, MonogramTile, StatusDots } from "./shared";
+import { BrandLogo } from "@/components/BrandLogo";
+import { ASSET_TYPE_LABEL, fmtInt, StatusDots } from "./shared";
 
 const MAX_CATEGORIES = 3;
 const MAX_ASSET_TYPES = 4;
@@ -16,7 +17,7 @@ export function AdapterCard({ adapter }: { adapter: AdapterSummary }) {
   return (
     <Link href={`/adapters/${adapter.toolId}`} className="card animate-fade-rise flex flex-col gap-3 p-4">
       <div className="flex items-start gap-3">
-        <MonogramTile name={adapter.name} />
+        <BrandLogo toolId={adapter.toolId} name={adapter.name} size={40} />
         <div className="min-w-0 flex-1">
           <h3 className="truncate text-[13.5px] font-bold">{adapter.name}</h3>
           <div className="truncate text-[11px] text-text3">{adapter.vendor || "—"}</div>
