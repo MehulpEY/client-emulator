@@ -74,7 +74,7 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
   const [body, setBody] = useState<string>(() => (!isGet && ep.request ? prettyJson(ep.request) : ""));
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
-  const [res, setRes] = useState<{ status: number; ms: number; body: any } | null>(null);
+  const [res, setRes] = useState<{ status: number; ms: number; body: any; curl: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   function resolvedPath(): string {
@@ -83,10 +83,9 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
     return basePath + p;
   }
 
-  async function send() {
-    setBusy(true); setErr(null); setRes(null);
+  /** The auth key + resolved query the request carries — shared by send() and the curl builder. */
+  function requestShape(): { url: string; headers: Record<string, string> } {
     const headers: Record<string, string> = {};
-    let url = resolvedPath();
     const qs = new URLSearchParams(query);
     if (apiKey) {
       if (auth.type === "api_key_query") qs.set(auth.param || "api_key", apiKey);
@@ -94,20 +93,39 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
       else if (auth.type === "basic") headers["Authorization"] = `Basic ${btoa("emulator:" + apiKey)}`;
       else if (auth.type === "api_key_header") headers[auth.param || "x-api-key"] = apiKey;
     }
+    let url = resolvedPath();
     const qstr = qs.toString();
     if (qstr) url += "?" + qstr;
+    return { url, headers };
+  }
 
+  /** curl for exactly what the form will send — absolute URL so it runs anywhere. */
+  function curlCommand(): string {
+    const { url, headers } = requestShape();
+    const abs = typeof window !== "undefined" ? new URL(url, window.location.origin).toString() : url;
+    const parts = [`curl -s${isGet ? "" : ` -X ${ep.method}`} "${abs}"`];
+    const sendBody = !isGet && body.trim();
+    if (sendBody) parts.push(`-H "content-type: application/json"`);
+    for (const [k, v] of Object.entries(headers)) parts.push(`-H "${k}: ${v}"`);
+    if (sendBody) parts.push(`-d '${body.replace(/'/g, "'\\''")}'`);
+    return parts.join(" \\\n  ");
+  }
+
+  async function send() {
+    setBusy(true); setErr(null); setRes(null);
+    const { url, headers } = requestShape();
     const init: RequestInit = { method: ep.method, headers };
     if (!isGet && body.trim()) {
       headers["content-type"] = "application/json";
       init.body = body;
     }
+    const curl = curlCommand();
     const t0 = performance.now();
     try {
       const r = await fetch(url, init);
       const ms = Math.round(performance.now() - t0);
       const json = await r.json().catch(() => ({}));
-      setRes({ status: r.status, ms, body: json });
+      setRes({ status: r.status, ms, body: json, curl });
     } catch (e: any) {
       setErr(e?.message || "Request failed");
     } finally {
@@ -170,22 +188,24 @@ function TryForm({ toolId, basePath, auth, ep }: { toolId: string; basePath: str
           </label>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button className="btn-primary" onClick={send} disabled={busy}>
             {busy ? <Spinner label="Sending..." /> : <><Play size={14} /> Send request</>}
           </button>
           <CopyButton value={resolvedPath()} label="Copy URL" className="h-8 !text-[11px]" />
+          <CopyButton value={curlCommand()} label="Copy as curl" className="h-8 !text-[11px]" />
         </div>
 
         {err && <div className="border border-danger-line bg-danger-bg px-3 py-2 text-[12px] text-danger">{err}</div>}
 
         {res && (
           <div>
-            <div className="mb-1.5 flex items-center gap-2">
+            <div className="mb-1.5 flex flex-wrap items-center gap-2">
               <span className="label">Response</span>
               <StatusBadge status={res.status} />
               <span className="text-[11px] text-text3">{res.ms}ms</span>
-              <JsonViewerButton value={res.body} title="Response body" className="ml-auto" />
+              <CopyButton value={res.curl} label="Copy as curl" className="ml-auto h-6 !text-[11px]" />
+              <JsonViewerButton value={res.body} title="Response body" />
               <CopyButton value={prettyJson(res.body)} label="Copy" className="h-6 !text-[11px]" />
             </div>
             <pre className="emu-scroll mono max-h-72 overflow-auto bg-surface-sunk p-3 text-[11.5px] leading-relaxed text-text2">{prettyJson(res.body)}</pre>
