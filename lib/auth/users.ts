@@ -5,7 +5,7 @@ import { q, tryQuery, SCHEMA } from "../db";
 import type { UserRow, Role, UserStatus, PublicUser } from "./types";
 
 const COLS =
-  "user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, reset_token_hash, reset_expires_at, created_by, created_at, onboarded_at, last_login_at";
+  "user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, reset_token_hash, reset_expires_at, autox_sub, created_by, created_at, onboarded_at, last_login_at";
 
 export function newUserId(): string {
   return `usr_${randomBytes(9).toString("hex")}`;
@@ -47,89 +47,13 @@ export async function getUserById(id: string): Promise<UserRow | null> {
   return rows[0] ?? null;
 }
 
-export async function getUserByInviteHash(hash: string): Promise<UserRow | null> {
-  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where invite_token_hash = $1 limit 1`, [hash]);
+export async function getUserByAutoxSub(sub: string): Promise<UserRow | null> {
+  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where autox_sub = $1 limit 1`, [sub]);
   return rows[0] ?? null;
-}
-
-export async function getUserByResetHash(hash: string): Promise<UserRow | null> {
-  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where reset_token_hash = $1 limit 1`, [hash]);
-  return rows[0] ?? null;
-}
-
-/** Store a fresh password-reset token hash + expiry (self-service forgot flow). */
-export async function setResetToken(userId: string, resetHash: string, expiresAt: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users set reset_token_hash = $2, reset_expires_at = $3 where user_id = $1`,
-    [userId, resetHash, expiresAt],
-  );
-}
-
-/** Complete a password reset: set the new password and burn the token. */
-export async function resetPassword(userId: string, passwordHash: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users
-        set password_hash = $2, reset_token_hash = null, reset_expires_at = null
-      where user_id = $1`,
-    [userId, passwordHash],
-  );
 }
 
 export async function listUsers(): Promise<UserRow[]> {
   return tryQuery<UserRow>(`select ${COLS} from ${SCHEMA}.users order by created_at desc`);
-}
-
-export interface CreateUserInput {
-  email: string;
-  name?: string;
-  role: Role;
-  status: UserStatus;
-  passwordHash?: string | null;
-  inviteHash?: string | null;
-  inviteExpiresAt?: string | null;
-  createdBy?: string | null;
-}
-
-export async function createUser(input: CreateUserInput): Promise<UserRow> {
-  const id = newUserId();
-  const rows = await q<UserRow>(
-    `insert into ${SCHEMA}.users
-       (user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, created_by, onboarded_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     returning ${COLS}`,
-    [
-      id,
-      input.email,
-      input.name ?? "",
-      input.role,
-      input.passwordHash ?? null,
-      input.status,
-      input.inviteHash ?? null,
-      input.inviteExpiresAt ?? null,
-      input.createdBy ?? null,
-      input.status === "active" ? new Date().toISOString() : null,
-    ],
-  );
-  return rows[0];
-}
-
-/** Store a fresh invite token hash + expiry (invite / resend). */
-export async function setInvite(userId: string, inviteHash: string, expiresAt: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users set invite_token_hash = $2, invite_expires_at = $3 where user_id = $1`,
-    [userId, inviteHash, expiresAt],
-  );
-}
-
-/** Complete onboarding: set the password, activate, and burn the invite token. */
-export async function activateWithPassword(userId: string, passwordHash: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users
-        set password_hash = $2, status = 'active', onboarded_at = now(),
-            invite_token_hash = null, invite_expires_at = null
-      where user_id = $1`,
-    [userId, passwordHash],
-  );
 }
 
 export async function recordLogin(userId: string): Promise<void> {
@@ -157,4 +81,63 @@ export async function updateUser(userId: string, patch: { role?: Role; status?: 
 
 export async function deleteUser(userId: string): Promise<void> {
   await q(`delete from ${SCHEMA}.users where user_id = $1`, [userId]);
+}
+
+export interface SsoUserInput {
+  sub: string; // AutoX stable subject
+  email: string;
+  emailVerified: boolean;
+  name: string;
+  role: Role; // token-derived; stored only as a refreshed-at-login display mirror
+}
+
+/**
+ * Link or JIT-provision the local record for an SSO identity, keyed on the
+ * stable `sub`. First login adopts a pre-existing (invite-era) row by *verified*
+ * email; thereafter we match on `sub` only (email can change, `sub` never does).
+ * The sign-in gate (restrictSignInToApps) upstream decides who reaches here, so
+ * an unknown user is created `active`. Returns null if the local row is disabled
+ * or the email is claimed by a row we can't safely link.
+ */
+export async function upsertSsoUser(input: SsoUserInput): Promise<UserRow | null> {
+  // 1) Already linked -> refresh display fields + role mirror, bump last login.
+  const linked = await getUserByAutoxSub(input.sub);
+  if (linked) {
+    if (linked.status === "disabled") return null;
+    const rows = await q<UserRow>(
+      `update ${SCHEMA}.users
+          set name = coalesce(nullif($2, ''), name), role = $3,
+              status = 'active', last_login_at = now()
+        where user_id = $1
+      returning ${COLS}`,
+      [linked.user_id, input.name, input.role],
+    );
+    return rows[0] ?? linked;
+  }
+
+  // 2) Not linked yet: adopt an existing row by verified email (one-time).
+  const byEmail = await getUserByEmail(input.email);
+  if (byEmail) {
+    if (!input.emailVerified || byEmail.autox_sub) return null; // refuse to hijack
+    if (byEmail.status === "disabled") return null;
+    const rows = await q<UserRow>(
+      `update ${SCHEMA}.users
+          set autox_sub = $2, name = coalesce(nullif($3, ''), name), role = $4,
+              status = 'active', onboarded_at = coalesce(onboarded_at, now()), last_login_at = now()
+        where user_id = $1 and autox_sub is null
+      returning ${COLS}`,
+      [byEmail.user_id, input.sub, input.name, input.role],
+    );
+    if (rows[0]) return rows[0];
+    return (await getUserByAutoxSub(input.sub)) ?? null; // lost a concurrent link race
+  }
+
+  // 3) Brand-new user: JIT provision, active.
+  const rows = await q<UserRow>(
+    `insert into ${SCHEMA}.users (user_id, email, name, role, status, autox_sub, onboarded_at, last_login_at)
+     values ($1, $2, $3, $4, 'active', $5, now(), now())
+     returning ${COLS}`,
+    [newUserId(), input.email, input.name, input.role, input.sub],
+  );
+  return rows[0];
 }

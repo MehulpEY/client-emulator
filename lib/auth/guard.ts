@@ -32,9 +32,14 @@ export async function getAuthUser(): Promise<SessionUser | null> {
 
   try {
     const row = await getUserById(session.sub);
+    // Existence + status (active/disabled/deleted) come from the DB - the local
+    // kill switch. ROLE comes from the session, which is set from the SSO token
+    // at login: the IdP is the source of truth for roles, not a persisted column
+    // (integration.md "Do not copy ... roles ... as the source of truth"). A
+    // role change therefore takes effect on the user's next login.
     const user: SessionUser | null =
       row && row.status === "active" // deleted / disabled / invited -> reject
-        ? { sub: row.user_id, email: row.email, name: row.name, role: row.role }
+        ? { sub: row.user_id, email: row.email, name: row.name, role: session.role }
         : null;
     authCache.set(session.sub, { user, at: Date.now() });
     return user;

@@ -114,7 +114,7 @@ function buildSections(s: ArchStats): Section[] {
             ["Motion and icons", "Framer Motion, Lucide", "Restrained animation, disabled under reduced-motion preferences."],
             ["Diagrams", "Mermaid", "Rendered client-side and themed from the same CSS tokens, so they match light and dark."],
             ["Database", "PostgreSQL on Supabase", "Reached with node-postgres. Everything lives in an emulator schema, never public."],
-            ["Email", "Resend", "Transactional email for invites and password resets, over its REST API."],
+            ["Identity", "AutoX SSO (OIDC)", "Single sign-on via Authorization Code + PKCE; the app mints its own signed session cookie after the callback."],
             ["Hosting", "Vercel, or a long-lived Node server", "The code detects which one it runs on and adapts pooling and scheduling."],
           ],
         },
@@ -187,7 +187,7 @@ function buildSections(s: ArchStats): Section[] {
           t: "ul",
           items: [
             "The public landing page and this architecture page.",
-            "The auth endpoints under /api/auth for login, setup, invite acceptance, password reset, and logout.",
+            "The SSO endpoints under /api/auth/sso for login, the OIDC callback, and the cold-start health probe, plus logout.",
             "The mock APIs under /api/mock, because agents authenticate with a per-tool API key rather than a browser session.",
             "The gateway under /api/gateway, because the connection itself embodies the credential.",
             "The inbound webhook receiver under /api/consumer, which accepts server-to-server delivery.",
@@ -651,7 +651,7 @@ function buildSections(s: ArchStats): Section[] {
           head: ["Service", "Role", "How it is used"],
           rows: [
             ["Supabase Postgres", "System of record for runtime state", "Reached through a connection pool. On serverless the app upgrades a recognized pooler URL to the transaction pooler so many function instances do not exhaust the connection limit."],
-            ["Resend", "Transactional email", "Sends invitations and password reset links over a REST call. If it is not configured, the app falls back to sharing an invite link manually."],
+            ["AutoX SSO", "Identity provider (OIDC)", "Authenticates users via Authorization Code + PKCE (ES256). The app verifies the ID token, reads the per-app role from the JWT access token, and provisions a local account on first sign-in."],
             ["Vercel", "Serverless hosting target", "The app detects serverless mode, keeps a tiny per-instance pool, and lets an external cron drive the schedulers."],
             ["Outbound webhooks", "Event delivery to consumers", "Domain events are delivered to subscriber URLs and signed with HMAC so the receiver can verify them."],
             ["AI agents and integrations", "The primary consumers", "They point a tool integration at a mock API directly, or at a connection's gateway URL."],
@@ -669,19 +669,21 @@ function buildSections(s: ArchStats): Section[] {
         {
           t: "p",
           text:
-            "Dashboard access is invitation-only. The first run creates the administrator account through " +
-            "a setup page. After that, new accounts are added by invitation, delivered by email or by " +
-            "sharing a link, and an active user can reset their own password through a single-use link " +
-            "that expires after one hour.",
+            "Dashboard access is delegated to AutoX SSO, an OpenID Connect provider. Users sign in through " +
+            "the Authorization Code flow with PKCE; the app verifies the ES256 ID token, reads the user's " +
+            "role for this application from the JWT access token, and provisions or links a local account " +
+            "on first sign-in, keyed on the stable subject claim. There is no local password, invitation, " +
+            "or reset flow — identity and per-app roles are managed centrally in AutoX.",
         },
         {
           t: "p",
           text:
-            "Sessions are carried in a signed cookie. The edge middleware verifies the signature and the " +
-            "role, and the server verifies again against the database inside route handlers and layouts. " +
-            "Secrets are never returned to the browser: connection credentials are stored server-side and " +
-            "are redacted or masked in every API response. Request logs redact sensitive headers and " +
-            "bodies before they are stored.",
+            "After a successful sign-in the app mints its own signed session cookie. The edge middleware " +
+            "verifies the signature, and the server re-checks against the database on each request that the " +
+            "account is still active, so a disabled account loses access immediately. Secrets are never " +
+            "returned to the browser: connection credentials are stored server-side and are redacted or " +
+            "masked in every API response. Request logs redact sensitive headers and bodies before they " +
+            "are stored.",
         },
         {
           t: "p",

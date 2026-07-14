@@ -13,7 +13,7 @@ export default async function UsersPage() {
       <PageHeader
         eyebrow="Administration"
         title="Users"
-        description="Onboard teammates and manage access. Administrators have full control (API keys, seeding, onboarding); consumers can observe the emulator and configure pub/sub."
+        description="Accounts provisioned via AutoX SSO on first sign-in. Roles are assigned in AutoX; here you can disable or remove local access. Administrators have full control; consumers observe the emulator and configure pub/sub."
       />
       <UsersClient initialUsers={users} meId={me.sub} />
     </div>

@@ -16,6 +16,7 @@ export interface UserRow {
   invite_expires_at: string | null;
   reset_token_hash: string | null;
   reset_expires_at: string | null;
+  autox_sub: string | null; // AutoX SSO subject; NULL until first SSO login links it
   created_by: string | null;
   created_at: string;
   onboarded_at: string | null;
