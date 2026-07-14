@@ -52,89 +52,8 @@ export async function getUserByAutoxSub(sub: string): Promise<UserRow | null> {
   return rows[0] ?? null;
 }
 
-export async function getUserByInviteHash(hash: string): Promise<UserRow | null> {
-  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where invite_token_hash = $1 limit 1`, [hash]);
-  return rows[0] ?? null;
-}
-
-export async function getUserByResetHash(hash: string): Promise<UserRow | null> {
-  const rows = await q<UserRow>(`select ${COLS} from ${SCHEMA}.users where reset_token_hash = $1 limit 1`, [hash]);
-  return rows[0] ?? null;
-}
-
-/** Store a fresh password-reset token hash + expiry (self-service forgot flow). */
-export async function setResetToken(userId: string, resetHash: string, expiresAt: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users set reset_token_hash = $2, reset_expires_at = $3 where user_id = $1`,
-    [userId, resetHash, expiresAt],
-  );
-}
-
-/** Complete a password reset: set the new password and burn the token. */
-export async function resetPassword(userId: string, passwordHash: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users
-        set password_hash = $2, reset_token_hash = null, reset_expires_at = null
-      where user_id = $1`,
-    [userId, passwordHash],
-  );
-}
-
 export async function listUsers(): Promise<UserRow[]> {
   return tryQuery<UserRow>(`select ${COLS} from ${SCHEMA}.users order by created_at desc`);
-}
-
-export interface CreateUserInput {
-  email: string;
-  name?: string;
-  role: Role;
-  status: UserStatus;
-  passwordHash?: string | null;
-  inviteHash?: string | null;
-  inviteExpiresAt?: string | null;
-  createdBy?: string | null;
-}
-
-export async function createUser(input: CreateUserInput): Promise<UserRow> {
-  const id = newUserId();
-  const rows = await q<UserRow>(
-    `insert into ${SCHEMA}.users
-       (user_id, email, name, role, password_hash, status, invite_token_hash, invite_expires_at, created_by, onboarded_at)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-     returning ${COLS}`,
-    [
-      id,
-      input.email,
-      input.name ?? "",
-      input.role,
-      input.passwordHash ?? null,
-      input.status,
-      input.inviteHash ?? null,
-      input.inviteExpiresAt ?? null,
-      input.createdBy ?? null,
-      input.status === "active" ? new Date().toISOString() : null,
-    ],
-  );
-  return rows[0];
-}
-
-/** Store a fresh invite token hash + expiry (invite / resend). */
-export async function setInvite(userId: string, inviteHash: string, expiresAt: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users set invite_token_hash = $2, invite_expires_at = $3 where user_id = $1`,
-    [userId, inviteHash, expiresAt],
-  );
-}
-
-/** Complete onboarding: set the password, activate, and burn the invite token. */
-export async function activateWithPassword(userId: string, passwordHash: string): Promise<void> {
-  await q(
-    `update ${SCHEMA}.users
-        set password_hash = $2, status = 'active', onboarded_at = now(),
-            invite_token_hash = null, invite_expires_at = null
-      where user_id = $1`,
-    [userId, passwordHash],
-  );
 }
 
 export async function recordLogin(userId: string): Promise<void> {

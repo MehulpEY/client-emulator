@@ -3,7 +3,7 @@ import type {
   SubscriptionRow, DeliveryRow, EventTypeView, DemoEvent, PublishResult, GeneratorRow,
   ToolStateResponse,
 } from "./types";
-import type { PublicUser, Role } from "./auth/types";
+import type { PublicUser } from "./auth/types";
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { cache: "no-store", ...init });
@@ -16,13 +16,6 @@ async function j<T>(url: string, init?: RequestInit): Promise<T> {
 async function jr<T>(url: string, init?: RequestInit): Promise<T> {
   const r = await fetch(url, { cache: "no-store", ...init });
   return (await r.json().catch(() => ({ ok: false, error: `request failed (${r.status})` }))) as T;
-}
-
-export interface InviteResult {
-  ok: boolean;
-  user?: PublicUser;
-  invite?: { url: string; emailed: boolean; error?: string };
-  error?: string;
 }
 
 const post = (body?: unknown): RequestInit => ({
@@ -86,11 +79,9 @@ export const api = {
   clearState: (tool: string, collection?: string) =>
     j<{ ok: boolean }>(`/api/resources/${encodeURIComponent(tool)}${collection ? "?collection=" + encodeURIComponent(collection) : ""}`, { method: "DELETE" }),
 
-  // -- users (admin only) ---------------------------------------------------
+  // -- users (admin only; identities come from AutoX SSO) -------------------
   users: () => j<{ reachable: boolean; users: PublicUser[] }>("/api/users"),
-  inviteUser: (body: { email: string; name?: string; role: Role }) => jr<InviteResult>("/api/users", post(body)),
-  updateUser: (id: string, body: { role?: Role; status?: "active" | "disabled" }) =>
+  updateUser: (id: string, body: { status: "active" | "disabled" }) =>
     jr<{ ok: boolean; user?: PublicUser; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
   deleteUser: (id: string) => jr<{ ok: boolean; error?: string }>(`/api/users/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  resendInvite: (id: string) => jr<{ ok: boolean; invite?: { url: string; emailed: boolean; error?: string }; error?: string }>(`/api/users/${encodeURIComponent(id)}/resend-invite`, post()),
 };
