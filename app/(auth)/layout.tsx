@@ -18,7 +18,12 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
   };
 
   return (
-    <div className="bg-aurora flex min-h-screen">
+    <>
+      {/* Warm the connection to the IdP while the sign-in screen renders, so the
+          cold-start health probe + redirect resolve faster (integration.md). */}
+      <link rel="preconnect" href="https://sso.autogrc.cloud" />
+      <link rel="dns-prefetch" href="https://sso.autogrc.cloud" />
+      <div className="bg-aurora flex min-h-screen">
       {/* left — product panel (lg+) */}
       <aside className="relative hidden w-[46%] max-w-[640px] flex-col justify-between border-r border-hair p-10 lg:flex">
         <div className="bg-dotted pointer-events-none absolute inset-0 opacity-60" aria-hidden />
@@ -62,6 +67,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           <Link href="/" className="transition-colors hover:text-accent-fg">about</Link>
         </footer>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

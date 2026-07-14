@@ -1,25 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck, UserRound } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/types";
 
 export function UserMenu({ user }: { user: SessionUser }) {
-  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const admin = user.role === "administrator";
 
-  async function logout() {
+  function logout() {
     if (busy) return;
     setBusy(true);
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-    } catch {
-      /* ignore - clear client state regardless */
-    }
-    router.push("/login");
-    router.refresh();
+    // Top-level navigation (not fetch) so the server can redirect the browser to
+    // the IdP's end_session_endpoint and actually end the SSO session.
+    window.location.href = "/api/auth/logout";
   }
 
   return (

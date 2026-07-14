@@ -222,6 +222,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS users_email_uidx ON users (lower(email));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_token_hash text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
 
+-- AutoX SSO (OIDC) linkage: the IdP's stable `sub` claim is the foreign key to
+-- a local user. Nullable so invite-era rows link on first SSO login (matched by
+-- verified email); unique among non-null values so one `sub` maps to one row.
+-- Additive + idempotent for existing DBs.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS autox_sub text;
+CREATE UNIQUE INDEX IF NOT EXISTS users_autox_sub_uidx ON users (autox_sub) WHERE autox_sub IS NOT NULL;
+
 -- ============================================================================
 -- ADAPTER PLATFORM (docs/adapter-platform/PLAN.md §4) ------------------------
 -- ============================================================================
