@@ -95,7 +95,9 @@ export interface SsoUserInput {
  *  CE overrides AutoX's "may sign in" decision — each is an explicit, rare policy
  *  choice, not a black box, so the callback can name it to the user and the logs:
  *   - `disabled`         local kill switch: an admin disabled this account here.
- *   - `email_conflict`   the email already belongs to a DIFFERENT AutoX `sub`.
+ *   - `email_conflict`   the email is linked to a DIFFERENT AutoX `sub` and can't
+ *                        be safely re-linked (only an *unverified* email is refused;
+ *                        a verified one re-links — see the safety net in step 2a).
  *   - `email_unverified` one-time adoption of a legacy row needs a verified email
  *                        (anti-takeover guard; AutoX sends email_verified=true for
  *                        managed accounts, so this is a corner case). */
@@ -111,7 +113,9 @@ export type SsoUpsertResult =
  * a validly-authenticated user is provisioned `active` and signed in. First login
  * adopts a pre-existing (invite-era) row by *verified* email as a ONE-TIME
  * migration step; thereafter we match on `sub` only (email can change, `sub`
- * never does). The only refusals are the explicit `SsoDenyReason` cases above.
+ * never does). If AutoX re-issues a NEW `sub` for a known verified email
+ * (delete+recreate), we re-link the row to it as a safety net (step 2a). The only
+ * refusals are the explicit `SsoDenyReason` cases above.
  */
 export async function upsertSsoUser(input: SsoUserInput): Promise<SsoUpsertResult> {
   // 1) Already linked -> refresh display fields + role mirror, bump last login.
@@ -129,10 +133,46 @@ export async function upsertSsoUser(input: SsoUserInput): Promise<SsoUpsertResul
     return { ok: true, user: rows[0] ?? linked };
   }
 
-  // 2) Not linked yet: one-time adoption of a legacy row by verified email.
+  // 2) A row exists for this email but wasn't matched by `sub` above.
   const byEmail = await getUserByEmail(input.email);
   if (byEmail) {
-    if (byEmail.autox_sub) return { ok: false, reason: "email_conflict" }; // owned by another sub
+    // 2a) The email is linked to a DIFFERENT AutoX identity (an old `sub`). This is
+    //     the delete+recreate-in-AutoX case: AutoX minted a fresh `sub` for the same
+    //     person. Re-link to the new one instead of dead-ending.
+    //
+    //     This is a SAFETY NET, not the primary path — the primary fix is
+    //     operational: admins Reset access (which keeps the `sub` stable), not
+    //     delete+re-invite; when they do, this branch never fires.
+    //
+    //     Safe because AutoX is the sole verifying issuer, enforces
+    //     one-email-one-live-account, and this row holds nothing sensitive. The one
+    //     thing this trades away is protection against an email being reassigned to a
+    //     different person — which AutoX does NOT guarantee across delete+recreate.
+    //     Revisit this if a second IdP is added, or if this row ever starts holding
+    //     sensitive / FK-referenced data. The verified-email gate plus the loud audit
+    //     log below are what keep a wrong re-link detectable and reversible.
+    if (byEmail.autox_sub && byEmail.autox_sub !== input.sub) {
+      if (byEmail.status === "disabled") return { ok: false, reason: "disabled" }; // kill switch still holds
+      if (!input.emailVerified) return { ok: false, reason: "email_conflict" }; // won't re-link on an unverified email
+      console.warn("[sso] re-linking local user to a new AutoX sub", {
+        user_id: byEmail.user_id,
+        email: byEmail.email,
+        old_sub: byEmail.autox_sub,
+        new_sub: input.sub,
+        at: new Date().toISOString(),
+      });
+      const rows = await q<UserRow>(
+        `update ${SCHEMA}.users
+            set autox_sub = $2, name = coalesce(nullif($3, ''), name), role = $4,
+                status = 'active', last_login_at = now()
+          where user_id = $1
+        returning ${COLS}`,
+        [byEmail.user_id, input.sub, input.name, input.role],
+      );
+      return rows[0] ? { ok: true, user: rows[0] } : { ok: false, reason: "email_conflict" };
+    }
+
+    // 2b) Unlinked row (autox_sub is null): one-time adoption of a legacy/invited row.
     if (!input.emailVerified) return { ok: false, reason: "email_unverified" }; // anti-takeover guard
     if (byEmail.status === "disabled") return { ok: false, reason: "disabled" };
     const rows = await q<UserRow>(
