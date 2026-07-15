@@ -229,6 +229,13 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_expires_at timestamptz;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS autox_sub text;
 CREATE UNIQUE INDEX IF NOT EXISTS users_autox_sub_uidx ON users (autox_sub) WHERE autox_sub IS NOT NULL;
 
+-- Live authorization: the AutoX refresh token (offline_access), AES-256-GCM
+-- encrypted at rest. Used to re-derive the user's role from a fresh access token
+-- on each request so a revocation in AutoX takes effect in seconds, not at the
+-- 12h session's expiry. Rotates on every use — always overwritten with the newest.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_refresh_token_enc text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS sso_refresh_at timestamptz;
+
 -- ============================================================================
 -- ADAPTER PLATFORM (docs/adapter-platform/PLAN.md §4) ------------------------
 -- ============================================================================

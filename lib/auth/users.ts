@@ -60,6 +60,26 @@ export async function recordLogin(userId: string): Promise<void> {
   await tryQuery(`update ${SCHEMA}.users set last_login_at = now() where user_id = $1`, [userId]);
 }
 
+// --- AutoX refresh token (offline_access), for live role re-derivation ---------
+// Stored encrypted (see tokenCrypto). Keyed by user_id, which is what the session
+// cookie carries. Rotates on every refresh, so we always overwrite with the newest.
+
+export async function storeRefreshToken(userId: string, enc: string): Promise<void> {
+  await q(`update ${SCHEMA}.users set sso_refresh_token_enc = $2, sso_refresh_at = now() where user_id = $1`, [userId, enc]);
+}
+
+export async function getRefreshTokenEnc(userId: string): Promise<string | null> {
+  const rows = await q<{ enc: string | null }>(
+    `select sso_refresh_token_enc as enc from ${SCHEMA}.users where user_id = $1 limit 1`,
+    [userId],
+  );
+  return rows[0]?.enc ?? null;
+}
+
+export async function clearRefreshToken(userId: string): Promise<void> {
+  await tryQuery(`update ${SCHEMA}.users set sso_refresh_token_enc = null, sso_refresh_at = null where user_id = $1`, [userId]);
+}
+
 export async function updateUser(userId: string, patch: { role?: Role; status?: UserStatus }): Promise<UserRow | null> {
   const sets: string[] = [];
   const vals: any[] = [userId];
