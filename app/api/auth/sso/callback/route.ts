@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient, verifyAccessToken, AUTOX_RESOURCE } from "@/lib/auth/oidc";
-import { upsertSsoUser } from "@/lib/auth/users";
+import { upsertSsoUser, type SsoDenyReason } from "@/lib/auth/users";
 import { signSession, SESSION_COOKIE, sessionCookieOptions, isSecureRequest } from "@/lib/auth/session";
 import type { Role } from "@/lib/auth/types";
 
@@ -14,6 +14,14 @@ export const dynamic = "force-dynamic";
 
 const SSO_ID_TOKEN_COOKIE = "sso_id_token";
 const TMP_COOKIES = ["sso_cv", "sso_state", "sso_nonce", "sso_next"];
+
+// The three explicit reasons CE (not AutoX) refuses a validly-authenticated user,
+// each with its own actionable message instead of one opaque "not permitted".
+const DENY_MESSAGES: Record<SsoDenyReason, string> = {
+  disabled: "your account has been disabled in this app — ask an administrator to re-enable it",
+  email_conflict: "this email is already linked to a different AutoX identity — please contact an administrator",
+  email_unverified: "your AutoX email isn’t verified yet — verify it in AutoX and sign in again",
+};
 
 function clearTmp(res: NextResponse, secure: boolean) {
   for (const n of TMP_COOKIES) {
@@ -111,13 +119,20 @@ export async function GET(req: NextRequest) {
   const emailVerified = idClaims.email_verified === true;
   const name = String(idClaims.name ?? idClaims.preferred_username ?? "");
 
-  let user;
+  let result;
   try {
-    user = await upsertSsoUser({ sub, email, emailVerified, name, role });
+    result = await upsertSsoUser({ sub, email, emailVerified, name, role });
   } catch {
     return fail(req, "we could not provision your account — please contact an administrator");
   }
-  if (!user) return fail(req, "your account is not permitted to sign in");
+  if (!result.ok) {
+    // Legible, not a black box: the exact reason goes to the logs and a distinct
+    // message goes to the user, so a disabled account is never mistaken for a
+    // role/token problem again (the whole point of splitting this out).
+    console.warn("[sso callback] sign-in refused by local user policy:", { reason: result.reason, sub, email });
+    return fail(req, DENY_MESSAGES[result.reason]);
+  }
+  const user = result.user;
 
   // Role in the session is token-derived (source of truth), not read back from
   // the DB (integration.md "Do not copy ... roles ... as the source of truth").

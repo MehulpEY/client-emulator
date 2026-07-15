@@ -91,19 +91,33 @@ export interface SsoUserInput {
   role: Role; // token-derived; stored only as a refreshed-at-login display mirror
 }
 
+/** Why a valid AutoX identity was refused a local row. These are the ONLY reasons
+ *  CE overrides AutoX's "may sign in" decision — each is an explicit, rare policy
+ *  choice, not a black box, so the callback can name it to the user and the logs:
+ *   - `disabled`         local kill switch: an admin disabled this account here.
+ *   - `email_conflict`   the email already belongs to a DIFFERENT AutoX `sub`.
+ *   - `email_unverified` one-time adoption of a legacy row needs a verified email
+ *                        (anti-takeover guard; AutoX sends email_verified=true for
+ *                        managed accounts, so this is a corner case). */
+export type SsoDenyReason = "disabled" | "email_conflict" | "email_unverified";
+
+export type SsoUpsertResult =
+  | { ok: true; user: UserRow }
+  | { ok: false; reason: SsoDenyReason };
+
 /**
- * Link or JIT-provision the local record for an SSO identity, keyed on the
- * stable `sub`. First login adopts a pre-existing (invite-era) row by *verified*
- * email; thereafter we match on `sub` only (email can change, `sub` never does).
- * The sign-in gate (restrictSignInToApps) upstream decides who reaches here, so
- * an unknown user is created `active`. Returns null if the local row is disabled
- * or the email is claimed by a row we can't safely link.
+ * Link or JIT-provision the local record for an SSO identity, keyed on the stable
+ * `sub`. AutoX owns authentication; this row is a projection, not a second gate —
+ * a validly-authenticated user is provisioned `active` and signed in. First login
+ * adopts a pre-existing (invite-era) row by *verified* email as a ONE-TIME
+ * migration step; thereafter we match on `sub` only (email can change, `sub`
+ * never does). The only refusals are the explicit `SsoDenyReason` cases above.
  */
-export async function upsertSsoUser(input: SsoUserInput): Promise<UserRow | null> {
+export async function upsertSsoUser(input: SsoUserInput): Promise<SsoUpsertResult> {
   // 1) Already linked -> refresh display fields + role mirror, bump last login.
   const linked = await getUserByAutoxSub(input.sub);
   if (linked) {
-    if (linked.status === "disabled") return null;
+    if (linked.status === "disabled") return { ok: false, reason: "disabled" };
     const rows = await q<UserRow>(
       `update ${SCHEMA}.users
           set name = coalesce(nullif($2, ''), name), role = $3,
@@ -112,14 +126,15 @@ export async function upsertSsoUser(input: SsoUserInput): Promise<UserRow | null
       returning ${COLS}`,
       [linked.user_id, input.name, input.role],
     );
-    return rows[0] ?? linked;
+    return { ok: true, user: rows[0] ?? linked };
   }
 
-  // 2) Not linked yet: adopt an existing row by verified email (one-time).
+  // 2) Not linked yet: one-time adoption of a legacy row by verified email.
   const byEmail = await getUserByEmail(input.email);
   if (byEmail) {
-    if (!input.emailVerified || byEmail.autox_sub) return null; // refuse to hijack
-    if (byEmail.status === "disabled") return null;
+    if (byEmail.autox_sub) return { ok: false, reason: "email_conflict" }; // owned by another sub
+    if (!input.emailVerified) return { ok: false, reason: "email_unverified" }; // anti-takeover guard
+    if (byEmail.status === "disabled") return { ok: false, reason: "disabled" };
     const rows = await q<UserRow>(
       `update ${SCHEMA}.users
           set autox_sub = $2, name = coalesce(nullif($3, ''), name), role = $4,
@@ -128,8 +143,10 @@ export async function upsertSsoUser(input: SsoUserInput): Promise<UserRow | null
       returning ${COLS}`,
       [byEmail.user_id, input.sub, input.name, input.role],
     );
-    if (rows[0]) return rows[0];
-    return (await getUserByAutoxSub(input.sub)) ?? null; // lost a concurrent link race
+    if (rows[0]) return { ok: true, user: rows[0] };
+    // Lost a concurrent link race: the row was linked between our read and write.
+    const now = await getUserByAutoxSub(input.sub);
+    return now ? { ok: true, user: now } : { ok: false, reason: "email_conflict" };
   }
 
   // 3) Brand-new user: JIT provision, active.
@@ -139,5 +156,5 @@ export async function upsertSsoUser(input: SsoUserInput): Promise<UserRow | null
      returning ${COLS}`,
     [newUserId(), input.email, input.name, input.role, input.sub],
   );
-  return rows[0];
+  return { ok: true, user: rows[0] };
 }
