@@ -48,9 +48,13 @@ export async function middleware(req: NextRequest) {
 
   if (isAdminOnly(pathname) && user.role !== "administrator") {
     if (isApi(pathname)) return NextResponse.json({ ok: false, error: "administrator role required" }, { status: 403 });
+    // Not a dead-end bounce to /overview: land on a page whose retry RE-AUTHORIZES
+    // (fresh /auth), so a role just granted in AutoX is picked up without a manual
+    // sign-out (integration.md — do not cache authorization). `next` carries the
+    // blocked path so a successful re-auth returns the user straight to it.
     const url = req.nextUrl.clone();
-    url.pathname = "/overview";
-    url.search = "";
+    url.pathname = "/no-access";
+    url.search = `?next=${encodeURIComponent(pathname)}`;
     return NextResponse.redirect(url);
   }
 

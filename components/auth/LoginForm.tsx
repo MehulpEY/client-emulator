@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 import { ShieldCheck } from "lucide-react";
 import { Spinner } from "@/components/ui";
+import { useSsoSignIn } from "@/lib/auth/useSsoSignIn";
 
 const rise: Variants = {
   hidden: { opacity: 0, y: 10 },
@@ -14,43 +15,17 @@ const still: Variants = { hidden: { opacity: 0 }, show: { opacity: 1, transition
 export function LoginForm() {
   const reduced = useReducedMotion();
   const item = reduced ? still : rise;
-  const [warming, setWarming] = useState(false);
-  const [ssoError, setSsoError] = useState<string | null>(null);
+  const { pending: warming, error: ssoError, start, setError } = useSsoSignIn();
 
   // Surface an error the SSO callback bounced back on (?sso_error=...).
   useEffect(() => {
     const e = new URLSearchParams(window.location.search).get("sso_error");
-    if (e) setSsoError(e);
-  }, []);
+    if (e) setError(e);
+  }, [setError]);
 
-  // Warm the (possibly cold, scale-to-zero) IdP and confirm it is genuinely
-  // live before handing off to the server login route (integration.md). We poll
-  // a SAME-ORIGIN proxy (/api/auth/sso/health) because the IdP's own /health has
-  // no CORS headers — a browser can't read it cross-origin.
-  async function signInWithSso() {
-    if (warming) return;
-    setWarming(true);
-    setSsoError(null);
+  function signInWithSso() {
     const next = new URLSearchParams(window.location.search).get("next") || "/overview";
-    const dest = `/api/auth/sso/login?next=${encodeURIComponent(next)}`;
-    const deadline = Date.now() + 60_000; // allow a cold start up to ~60s
-    while (Date.now() < deadline) {
-      try {
-        const r = await fetch("/api/auth/sso/health", { cache: "no-store" });
-        if (r.ok) {
-          const body = await r.json().catch(() => null);
-          if (body && body.status === "ok") {
-            window.location.href = dest;
-            return;
-          }
-        }
-      } catch {
-        /* server momentarily unreachable — retry */
-      }
-      await new Promise((res) => setTimeout(res, 2000));
-    }
-    setWarming(false);
-    setSsoError("Sign-in is waking up and didn’t respond in time. Please try again in a moment.");
+    start(next);
   }
 
   return (
