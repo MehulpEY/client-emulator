@@ -18,6 +18,9 @@ export async function requireUser(): Promise<SessionUser> {
 export async function requireAdmin(): Promise<SessionUser> {
   const user = await getAuthUser();
   if (!user) redirect("/login");
-  if (user.role !== "administrator") redirect("/");
+  // Defense-in-depth fallback (middleware is the primary gate and carries the
+  // precise `next`): send under-privileged users to the re-authorize surface,
+  // not silently to "/", so a role change can be picked up without signing out.
+  if (user.role !== "administrator") redirect("/no-access");
   return user;
 }
