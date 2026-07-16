@@ -73,14 +73,23 @@ async function verify(token: string | undefined | null): Promise<Record<string, 
   return payload;
 }
 
-export function signSession(user: SessionUser): Promise<string> {
-  return sign({ t: "session", sub: user.sub, email: user.email, name: user.name, role: user.role }, SESSION_TTL_SECONDS);
+export function signSession(user: SessionUser, opts: { live?: boolean } = {}): Promise<string> {
+  return sign(
+    { t: "session", sub: user.sub, email: user.email, name: user.name, role: user.role, live: opts.live ? 1 : 0 },
+    SESSION_TTL_SECONDS,
+  );
 }
 
 export async function verifySession(token: string | undefined | null): Promise<SessionUser | null> {
   const p = await verify(token);
   if (!p || p.t !== "session" || !p.sub) return null;
-  return { sub: String(p.sub), email: String(p.email ?? ""), name: String(p.name ?? ""), role: p.role as Role };
+  return {
+    sub: String(p.sub),
+    email: String(p.email ?? ""),
+    name: String(p.name ?? ""),
+    role: p.role as Role,
+    live: p.live === 1,
+  };
 }
 
 /** True when the request arrived over HTTPS (directly or via a proxy). Used to

@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 /**
  * Postgres access for the emulator (Supabase). Mirrors the ZTPA pattern but adds
@@ -122,6 +122,36 @@ export async function tryQuery<T = any>(text: string, params: any[] = [], fallba
     return await q<T>(text, params);
   } catch {
     return fallback;
+  }
+}
+
+/**
+ * Run `fn` while holding a Postgres transaction-scoped ADVISORY LOCK keyed on
+ * `key`, serializing it across every instance/process on the same database. Used
+ * to make AutoX refresh-token rotation safe on serverless: without a cross-instance
+ * lock, two Vercel instances can present the same rotating refresh token
+ * concurrently, tripping AutoX's reuse detection and killing the whole grant.
+ *
+ * `fn` receives the SAME pooled client that holds the lock — it MUST run its DB
+ * work on that client (not the pool) because a serverless pool has one connection,
+ * so a second checkout would deadlock. `fn` should return a value, not throw, for
+ * anything it wants committed. The lock releases on COMMIT/ROLLBACK. A bounded
+ * `lock_timeout` keeps a wedged holder from blocking everyone indefinitely.
+ */
+export async function withAdvisoryLock<T>(key: string, fn: (client: PoolClient) => Promise<T>): Promise<T> {
+  const client = await pool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL lock_timeout = '8s'");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1)::bigint)", [key]);
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (e) {
+    try { await client.query("ROLLBACK"); } catch { /* connection already broken */ }
+    throw e;
+  } finally {
+    client.release();
   }
 }
 

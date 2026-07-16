@@ -56,9 +56,21 @@ export async function getAuthUser(opts: { live?: boolean } = {}): Promise<Sessio
   // 2) Live authorization: role from a fresh AutoX token, never the cookie.
   const live = await getLiveRole(session.sub, { force: !!opts.live });
   let role: Role;
-  if ("role" in live) role = live.role;
-  else if ("revoked" in live) return null; // AutoX killed the grant/account -> re-auth
-  else role = session.role; // pre-upgrade session (no refresh token) -> cookie fallback
+  if ("role" in live) {
+    role = live.role;
+  } else if ("revoked" in live) {
+    return null; // AutoX killed the grant/account -> re-auth
+  } else if ("noToken" in live) {
+    // No live token. For a session that was minted WITH one (live-managed), that
+    // means the grant was revoked and the token cleared -> deny (fail-closed). For a
+    // genuine pre-upgrade session (never had a token) -> fall back to the cookie role.
+    if (session.live) return null;
+    role = session.role;
+  } else {
+    // unavailable: transient DB/AutoX blip -> trust the signed cookie for this request
+    // rather than logging everyone out on a hiccup.
+    role = session.role;
+  }
 
   return { sub: identity.sub, email: identity.email, name: identity.name, role };
 }

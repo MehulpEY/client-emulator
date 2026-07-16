@@ -29,6 +29,11 @@ export interface SessionUser {
   email: string;
   name: string;
   role: Role;
+  // True when this session was minted WITH a stored AutoX refresh token (live role
+  // re-derivation is armed). If such a session later finds no token, that means the
+  // grant was revoked -> deny, rather than falling back to the cookie role. Absent
+  // on pre-upgrade sessions, which still fall back to the cookie.
+  live?: boolean;
 }
 
 /** Safe shape returned to the browser (no secrets). */

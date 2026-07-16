@@ -1,24 +1,30 @@
 // Live authorization. The user's role is derived from a FRESH AutoX access token
 // on (almost) every request — never trusted from the 12h session cookie, which
 // carries identity only. So a role removed in AutoX takes effect in seconds, not
-// when the cookie finally expires. AutoX refresh tokens rotate on every use with
-// reuse detection, so refreshes are single-flighted per user and the rotated
-// token is persisted immediately.
+// when the cookie finally expires.
 //
-// Node-only (openid-client + node:crypto). Import from route handlers / server
+// AutoX rotates the refresh token on EVERY use and kills the whole grant family if
+// an already-rotated token is presented again (reuse detection). On serverless,
+// concurrent requests land on different instances that each read the same stored
+// token and refresh at once — tripping that detection and destroying the grant. So
+// the read-refresh-store cycle is serialized across instances with a Postgres
+// advisory lock, and the token is RE-READ inside the lock so every refresh uses the
+// newest rotated value.
+//
+// Node-only (openid-client + node:crypto + pg). Import from route handlers / server
 // components, never edge middleware.
 
 import type { Role } from "./types";
 import { refreshAppRoles } from "./oidc";
 import { deriveRole } from "./roles";
 import { encryptSecret, decryptSecret } from "./tokenCrypto";
-import { getRefreshTokenEnc, storeRefreshToken, clearRefreshToken } from "./users";
-import { tryQuery, SCHEMA } from "../db"; // TEMP: refresh-outcome diagnostic
+import { withAdvisoryLock, SCHEMA } from "../db";
 
 export type LiveRole =
-  | { role: Role }        // derived from a fresh token (or last-known-good on a transient blip)
-  | { revoked: true }     // AutoX killed the grant/account -> force re-auth / 401
-  | { noToken: true };    // pre-upgrade session or offline_access not granted -> caller uses cookie role
+  | { role: Role }         // derived from a fresh token (or last-known-good on a transient blip)
+  | { revoked: true }      // AutoX killed the grant/account -> force re-auth / 401
+  | { noToken: true }      // no refresh token stored (pre-upgrade session, or it was cleared)
+  | { unavailable: true }; // DB/AutoX momentarily unreachable -> caller trusts the cookie this request
 
 // A tiny shared-staleness window so a burst of requests doesn't refresh per call.
 // `force` (critical mutations) bypasses it entirely. Per-instance on serverless;
@@ -47,60 +53,85 @@ export async function getLiveRole(userId: string, opts: { force?: boolean } = {}
 }
 
 async function deriveLive(userId: string): Promise<LiveRole> {
-  let enc: string | null;
   try {
-    enc = await getRefreshTokenEnc(userId);
-  } catch {
-    // DB unreachable — can't check live this request. Fall back to the signed
-    // cookie role rather than logging everyone out on a DB blip.
-    return { noToken: true };
-  }
-  if (!enc) return { noToken: true }; // no offline_access token stored (pre-upgrade session)
+    return await withAdvisoryLock(`sso-refresh:${userId}`, async (client) => {
+      // Re-read the CURRENT token INSIDE the lock — another instance may have rotated
+      // it while we waited, and presenting a stale token trips AutoX reuse detection.
+      const sel = await client.query(
+        `select sso_refresh_token_enc as enc from ${SCHEMA}.users where user_id = $1 limit 1`,
+        [userId],
+      );
+      const enc: string | null = sel.rows[0]?.enc ?? null;
+      if (!enc) return { noToken: true } as LiveRole; // no offline_access token stored
 
-  let refreshToken: string;
-  try {
-    refreshToken = decryptSecret(enc);
-  } catch {
-    // Unreadable ciphertext (e.g. AUTH_SECRET was rotated). Can't refresh -> re-auth.
-    return { revoked: true };
-  }
+      let refreshToken: string;
+      try {
+        refreshToken = decryptSecret(enc);
+      } catch {
+        // Unreadable ciphertext (e.g. AUTH_SECRET rotated). Can't refresh -> re-auth.
+        return { revoked: true } as LiveRole;
+      }
 
-  try {
-    const { appRoles, refreshToken: rotated } = await refreshAppRoles(refreshToken);
-    const role = deriveRole(appRoles);
-    roleCache.set(userId, { role, at: Date.now() });
-    if (rotated !== refreshToken) {
-      // Persist immediately — a stale refresh token would trip reuse detection.
-      await storeRefreshToken(userId, encryptSecret(rotated)).catch(() => {});
-    }
-    // TEMP DIAGNOSTIC: the refresh succeeded — record roles + whether it rotated.
-    await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_OK', $2)`,
-      [userId, `roles=[${appRoles.join(",")}] ${rotated !== refreshToken ? "rotated" : "same"}`]).catch(() => {});
-    return { role };
-  } catch (err: any) {
-    // Distinguish a real revocation from a transient outage: removing an app ROLE
-    // still returns a valid token (fewer roles) — this catch only fires when the
-    // GRANT itself is gone (suspended/revoked) or AutoX is momentarily down.
-    const code = String(err?.error || "");
-    if (code === "invalid_grant" || code === "invalid_request") {
-      console.warn("[sso] grant revoked — forcing re-auth", { userId, error: code });
-      // TEMP DIAGNOSTIC: capture the exact AutoX error that triggered the clear.
-      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_REVOKED', $2)`,
-        [userId, `${code} | name=${err?.name ?? ""} | ${String(err?.error_description ?? err?.message ?? "")}`.slice(0, 500)]).catch(() => {});
-      roleCache.delete(userId);
-      await clearRefreshToken(userId).catch(() => {});
-      return { revoked: true };
-    }
-    // Transient (network / AutoX 5xx): don't punish the user. Use last-known-good
-    // if we have it, else let the caller fall back to the cookie role.
-    console.warn("[sso] live role refresh transient error — not revoking", {
-      userId,
-      error: String(err?.message || err),
+      try {
+        const { appRoles, refreshToken: rotated } = await refreshAppRoles(refreshToken);
+        const role = deriveRole(appRoles);
+        roleCache.set(userId, { role, at: Date.now() });
+        if (rotated !== refreshToken) {
+          // Persist the rotated token immediately (same locked connection), so the
+          // next holder re-reads the fresh value.
+          await client.query(
+            `update ${SCHEMA}.users set sso_refresh_token_enc = $2, sso_refresh_at = now() where user_id = $1`,
+            [userId, encryptSecret(rotated)],
+          );
+        }
+        // TEMP DIAGNOSTIC
+        await client
+          .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_OK', $2)`, [
+            userId,
+            `roles=[${appRoles.join(",")}] ${rotated !== refreshToken ? "rotated" : "same"}`,
+          ])
+          .catch(() => {});
+        return { role } as LiveRole;
+      } catch (err: any) {
+        // Removing an app ROLE still returns a valid token (fewer roles); this only
+        // fires when the GRANT itself is gone (suspended/revoked) or AutoX is down.
+        const code = String(err?.error || "");
+        if (code === "invalid_grant" || code === "invalid_request") {
+          console.warn("[sso] grant revoked — forcing re-auth", { userId, error: code });
+          roleCache.delete(userId);
+          await client.query(
+            `update ${SCHEMA}.users set sso_refresh_token_enc = null, sso_refresh_at = null where user_id = $1`,
+            [userId],
+          );
+          // TEMP DIAGNOSTIC
+          await client
+            .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_REVOKED', $2)`, [
+              userId,
+              `${code} | ${String(err?.error_description ?? err?.message ?? "")}`.slice(0, 300),
+            ])
+            .catch(() => {});
+          return { revoked: true } as LiveRole;
+        }
+        // Transient (network / AutoX 5xx): don't punish. Use last-known-good if we
+        // have it, else tell the caller it's unavailable (trust the cookie once).
+        console.warn("[sso] live role refresh transient error — not revoking", {
+          userId,
+          error: String(err?.message || err),
+        });
+        // TEMP DIAGNOSTIC
+        await client
+          .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_TRANSIENT', $2)`, [
+            userId,
+            String(err?.error_description ?? err?.message ?? err).slice(0, 300),
+          ])
+          .catch(() => {});
+        const c = roleCache.get(userId);
+        return (c ? { role: c.role } : { unavailable: true }) as LiveRole;
+      }
     });
-    // TEMP DIAGNOSTIC: capture the transient error detail.
-    await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_TRANSIENT', $2)`,
-      [userId, `name=${err?.name ?? ""} | ${String(err?.error_description ?? err?.message ?? err)}`.slice(0, 500)]).catch(() => {});
-    const c = roleCache.get(userId);
-    return c ? { role: c.role } : { noToken: true };
+  } catch {
+    // Couldn't acquire the lock / DB unreachable this request. Don't log anyone out
+    // on a DB blip — report unavailable so the caller trusts the signed cookie once.
+    return { unavailable: true };
   }
 }

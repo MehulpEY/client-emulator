@@ -147,9 +147,13 @@ export async function GET(req: NextRequest) {
   // a fresh token per request — this is what makes a revocation in AutoX bite in
   // seconds. Best-effort: if offline_access wasn't granted, live checks degrade to
   // the cookie role (see getLiveRole), so a missing token must not break sign-in.
+  // `live` marks the session as refresh-token-backed: getAuthUser then fails CLOSED
+  // if the token later disappears (revoked), instead of falling back to the cookie.
+  let live = false;
   if (tokenSet.refresh_token) {
     try {
       await storeRefreshToken(user.user_id, encryptSecret(tokenSet.refresh_token));
+      live = true;
       // TEMP DIAGNOSTIC: record that the store succeeded (marker in granted_scope).
       await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'STORE_OK', '')`, [user.user_id]);
     } catch (e: any) {
@@ -163,7 +167,7 @@ export async function GET(req: NextRequest) {
   // Role in the session cookie is only an identity hint now — the authoritative
   // role is re-derived live per request (getLiveRole). We still stamp the current
   // one so the cookie is a usable fallback while a refresh token exists.
-  const session = await signSession({ sub: user.user_id, email: user.email, name: user.name, role });
+  const session = await signSession({ sub: user.user_id, email: user.email, name: user.name, role }, { live });
 
   const url = req.nextUrl.clone();
   url.pathname = next;
