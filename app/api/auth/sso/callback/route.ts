@@ -150,7 +150,10 @@ export async function GET(req: NextRequest) {
   if (tokenSet.refresh_token) {
     try {
       await storeRefreshToken(user.user_id, encryptSecret(tokenSet.refresh_token));
+      // TEMP DIAGNOSTIC: record that the store succeeded (marker in granted_scope).
+      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'STORE_OK', '')`, [user.user_id]);
     } catch (e: any) {
+      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'STORE_ERR', $2)`, [user.user_id, String(e?.message ?? e)]);
       console.warn("[sso callback] could not store refresh token:", e?.message ?? e);
     }
   } else {

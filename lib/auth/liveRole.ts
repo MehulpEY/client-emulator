@@ -13,6 +13,7 @@ import { refreshAppRoles } from "./oidc";
 import { deriveRole } from "./roles";
 import { encryptSecret, decryptSecret } from "./tokenCrypto";
 import { getRefreshTokenEnc, storeRefreshToken, clearRefreshToken } from "./users";
+import { tryQuery, SCHEMA } from "../db"; // TEMP: refresh-outcome diagnostic
 
 export type LiveRole =
   | { role: Role }        // derived from a fresh token (or last-known-good on a transient blip)
@@ -72,6 +73,9 @@ async function deriveLive(userId: string): Promise<LiveRole> {
       // Persist immediately — a stale refresh token would trip reuse detection.
       await storeRefreshToken(userId, encryptSecret(rotated)).catch(() => {});
     }
+    // TEMP DIAGNOSTIC: the refresh succeeded — record roles + whether it rotated.
+    await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_OK', $2)`,
+      [userId, `roles=[${appRoles.join(",")}] ${rotated !== refreshToken ? "rotated" : "same"}`]).catch(() => {});
     return { role };
   } catch (err: any) {
     // Distinguish a real revocation from a transient outage: removing an app ROLE
@@ -80,6 +84,9 @@ async function deriveLive(userId: string): Promise<LiveRole> {
     const code = String(err?.error || "");
     if (code === "invalid_grant" || code === "invalid_request") {
       console.warn("[sso] grant revoked — forcing re-auth", { userId, error: code });
+      // TEMP DIAGNOSTIC: capture the exact AutoX error that triggered the clear.
+      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_REVOKED', $2)`,
+        [userId, `${code} | name=${err?.name ?? ""} | ${String(err?.error_description ?? err?.message ?? "")}`.slice(0, 500)]).catch(() => {});
       roleCache.delete(userId);
       await clearRefreshToken(userId).catch(() => {});
       return { revoked: true };
@@ -90,6 +97,9 @@ async function deriveLive(userId: string): Promise<LiveRole> {
       userId,
       error: String(err?.message || err),
     });
+    // TEMP DIAGNOSTIC: capture the transient error detail.
+    await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_TRANSIENT', $2)`,
+      [userId, `name=${err?.name ?? ""} | ${String(err?.error_description ?? err?.message ?? err)}`.slice(0, 500)]).catch(() => {});
     const c = roleCache.get(userId);
     return c ? { role: c.role } : { noToken: true };
   }
