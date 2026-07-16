@@ -8,6 +8,7 @@
 
 import { Issuer, generators, type Client } from "openid-client";
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
+import { extractAppRoles } from "./roles";
 
 const ISSUER_URL = process.env.AUTOX_ISSUER || "https://sso.autogrc.cloud";
 
@@ -67,4 +68,19 @@ export async function verifyAccessToken(token: string): Promise<JWTPayload> {
     algorithms: ["ES256"],
   });
   return payload;
+}
+
+/** Exchange the refresh token for a fresh access token and read the CURRENT app
+ *  roles from it (aud=AUTOX_RESOURCE, so it's a verifiable JWT). AutoX rotates the
+ *  refresh token on every use, so the caller MUST persist the returned
+ *  `refreshToken`. Throws (OPError `invalid_grant`) when the grant is revoked or
+ *  the account is suspended — callers treat that as "access revoked". */
+export async function refreshAppRoles(refreshToken: string): Promise<{ appRoles: string[]; refreshToken: string }> {
+  const client = await getClient();
+  const ts = await client.refresh(refreshToken, { exchangeBody: { resource: AUTOX_RESOURCE } });
+  let appRoles: string[] = [];
+  if (ts.access_token) {
+    appRoles = extractAppRoles(await verifyAccessToken(ts.access_token));
+  }
+  return { appRoles, refreshToken: ts.refresh_token ?? refreshToken };
 }

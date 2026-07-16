@@ -40,7 +40,10 @@ export async function GET(req: NextRequest) {
   const next = safeNext(req.nextUrl.searchParams.get("next"));
 
   const url = client.authorizationUrl({
-    scope: "openid profile email roles",
+    // `offline_access` issues a (rotating) refresh token — CE uses it to re-derive
+    // the role from a fresh access token per request, so a revocation in AutoX
+    // takes effect in seconds rather than at the 12h session's expiry.
+    scope: "openid profile email roles offline_access",
     code_challenge,
     code_challenge_method: "S256",
     state,

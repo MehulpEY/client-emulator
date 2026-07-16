@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SESSION_COOKIE, isSecureRequest } from "@/lib/auth/session";
+import { SESSION_COOKIE, isSecureRequest, verifySession } from "@/lib/auth/session";
 import { getClient } from "@/lib/auth/oidc";
+import { clearRefreshToken } from "@/lib/auth/users";
+import { invalidateAuthUser } from "@/lib/auth/guard";
 
 // RP-initiated logout. The browser navigates here (top-level GET) so the
 // redirect to the IdP's end_session_endpoint actually ends the SSO session.
@@ -15,6 +17,14 @@ const SSO_ID_TOKEN_COOKIE = "sso_id_token";
 async function endSession(req: NextRequest): Promise<NextResponse> {
   const secure = isSecureRequest(req);
   const idToken = req.cookies.get(SSO_ID_TOKEN_COOKIE)?.value;
+
+  // Drop the stored refresh token so the grant can't be used to re-derive a role
+  // after logout, and evict the live-role cache immediately.
+  const session = await verifySession(req.cookies.get(SESSION_COOKIE)?.value);
+  if (session) {
+    invalidateAuthUser(session.sub);
+    await clearRefreshToken(session.sub).catch(() => {});
+  }
 
   let target = new URL("/login", req.nextUrl.origin).toString();
   if (idToken) {

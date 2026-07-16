@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getClient, verifyAccessToken, AUTOX_RESOURCE } from "@/lib/auth/oidc";
-import { upsertSsoUser, type SsoDenyReason } from "@/lib/auth/users";
+import { upsertSsoUser, storeRefreshToken, type SsoDenyReason } from "@/lib/auth/users";
 import { signSession, SESSION_COOKIE, sessionCookieOptions, isSecureRequest } from "@/lib/auth/session";
-import type { Role } from "@/lib/auth/types";
+import { deriveRole, extractAppRoles } from "@/lib/auth/roles";
+import { encryptSecret } from "@/lib/auth/tokenCrypto";
 
 // Complete the SSO login: exchange the code (PKCE), verify the ID token, read
 // the app-scoped role from the JWT access token, then link/create the local
@@ -40,15 +41,6 @@ function fail(req: NextRequest, msg: string): NextResponse {
 
 function safeNext(raw: string | undefined): string {
   return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : "/overview";
-}
-
-/** Map the AutoX app-scoped roles to our two roles. `autox:app_roles` (an array
- *  in the JWT access token) is authoritative for "their roles in THIS app":
- *  administrator if it contains "administrator", else consumer. Least privilege
- *  by default (empty/absent -> consumer). Per integration.md we do NOT fall back
- *  to the global `autox:roles` for this app-specific decision. */
-function deriveRole(appRoles: string[]): Role {
-  return appRoles.includes("administrator") ? "administrator" : "consumer";
 }
 
 export async function GET(req: NextRequest) {
@@ -104,11 +96,7 @@ export async function GET(req: NextRequest) {
   // A throw here (opaque token / verification failure) just means "no app roles".
   let appRoles: string[] = [];
   try {
-    if (tokenSet.access_token) {
-      const at = await verifyAccessToken(tokenSet.access_token);
-      const v = at["autox:app_roles"];
-      if (Array.isArray(v)) appRoles = v.filter((r): r is string => typeof r === "string");
-    }
+    if (tokenSet.access_token) appRoles = extractAppRoles(await verifyAccessToken(tokenSet.access_token));
   } catch (err: any) {
     console.warn("[sso callback] app_roles access-token verify failed (defaulting role):", err?.message ?? err);
   }
@@ -134,8 +122,23 @@ export async function GET(req: NextRequest) {
   }
   const user = result.user;
 
-  // Role in the session is token-derived (source of truth), not read back from
-  // the DB (integration.md "Do not copy ... roles ... as the source of truth").
+  // Persist the (encrypted) refresh token so authorization can be re-derived from
+  // a fresh token per request — this is what makes a revocation in AutoX bite in
+  // seconds. Best-effort: if offline_access wasn't granted, live checks degrade to
+  // the cookie role (see getLiveRole), so a missing token must not break sign-in.
+  if (tokenSet.refresh_token) {
+    try {
+      await storeRefreshToken(user.user_id, encryptSecret(tokenSet.refresh_token));
+    } catch (e: any) {
+      console.warn("[sso callback] could not store refresh token:", e?.message ?? e);
+    }
+  } else {
+    console.warn("[sso callback] no refresh_token returned (offline_access not granted?) — live revocation disabled for this session");
+  }
+
+  // Role in the session cookie is only an identity hint now — the authoritative
+  // role is re-derived live per request (getLiveRole). We still stamp the current
+  // one so the cookie is a usable fallback while a refresh token exists.
   const session = await signSession({ sub: user.user_id, email: user.email, name: user.name, role });
 
   const url = req.nextUrl.clone();
