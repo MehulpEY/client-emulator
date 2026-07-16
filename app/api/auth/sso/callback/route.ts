@@ -4,7 +4,6 @@ import { upsertSsoUser, storeRefreshToken, type SsoDenyReason } from "@/lib/auth
 import { signSession, SESSION_COOKIE, sessionCookieOptions, isSecureRequest } from "@/lib/auth/session";
 import { deriveRole, extractAppRoles } from "@/lib/auth/roles";
 import { encryptSecret } from "@/lib/auth/tokenCrypto";
-import { tryQuery, SCHEMA } from "@/lib/db"; // TEMP: refresh-token diagnostic
 
 // Complete the SSO login: exchange the code (PKCE), verify the ID token, read
 // the app-scoped role from the JWT access token, then link/create the local
@@ -108,26 +107,6 @@ export async function GET(req: NextRequest) {
   const emailVerified = idClaims.email_verified === true;
   const name = String(idClaims.name ?? idClaims.preferred_username ?? "");
 
-  // TEMP DIAGNOSTIC (remove after refresh-token investigation): record ONLY the
-  // shape of the token response — did AutoX return refresh_token? which scopes were
-  // granted? — never the token values. Best-effort so it can't affect sign-in.
-  try {
-    await tryQuery(
-      `insert into ${SCHEMA}._sso_debug (sub, has_refresh, has_access, has_id, granted_scope, token_keys)
-       values ($1, $2, $3, $4, $5, $6)`,
-      [
-        sub,
-        !!tokenSet.refresh_token,
-        !!tokenSet.access_token,
-        !!tokenSet.id_token,
-        tokenSet.scope ?? null,
-        Object.keys(tokenSet).join(","),
-      ],
-    );
-  } catch (e: any) {
-    console.warn("[sso callback] debug insert failed:", e?.message ?? e);
-  }
-
   let result;
   try {
     result = await upsertSsoUser({ sub, email, emailVerified, name, role });
@@ -154,10 +133,7 @@ export async function GET(req: NextRequest) {
     try {
       await storeRefreshToken(user.user_id, encryptSecret(tokenSet.refresh_token));
       live = true;
-      // TEMP DIAGNOSTIC: record that the store succeeded (marker in granted_scope).
-      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'STORE_OK', '')`, [user.user_id]);
     } catch (e: any) {
-      await tryQuery(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'STORE_ERR', $2)`, [user.user_id, String(e?.message ?? e)]);
       console.warn("[sso callback] could not store refresh token:", e?.message ?? e);
     }
   } else {

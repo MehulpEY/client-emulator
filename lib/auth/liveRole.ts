@@ -84,13 +84,6 @@ async function deriveLive(userId: string): Promise<LiveRole> {
             [userId, encryptSecret(rotated)],
           );
         }
-        // TEMP DIAGNOSTIC
-        await client
-          .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_OK', $2)`, [
-            userId,
-            `roles=[${appRoles.join(",")}] ${rotated !== refreshToken ? "rotated" : "same"}`,
-          ])
-          .catch(() => {});
         return { role } as LiveRole;
       } catch (err: any) {
         // Removing an app ROLE still returns a valid token (fewer roles); this only
@@ -103,13 +96,6 @@ async function deriveLive(userId: string): Promise<LiveRole> {
             `update ${SCHEMA}.users set sso_refresh_token_enc = null, sso_refresh_at = null where user_id = $1`,
             [userId],
           );
-          // TEMP DIAGNOSTIC
-          await client
-            .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_REVOKED', $2)`, [
-              userId,
-              `${code} | ${String(err?.error_description ?? err?.message ?? "")}`.slice(0, 300),
-            ])
-            .catch(() => {});
           return { revoked: true } as LiveRole;
         }
         // Transient (network / AutoX 5xx): don't punish. Use last-known-good if we
@@ -118,13 +104,6 @@ async function deriveLive(userId: string): Promise<LiveRole> {
           userId,
           error: String(err?.message || err),
         });
-        // TEMP DIAGNOSTIC
-        await client
-          .query(`insert into ${SCHEMA}._sso_debug (sub, granted_scope, token_keys) values ($1, 'REFRESH_TRANSIENT', $2)`, [
-            userId,
-            String(err?.error_description ?? err?.message ?? err).slice(0, 300),
-          ])
-          .catch(() => {});
         const c = roleCache.get(userId);
         return (c ? { role: c.role } : { unavailable: true }) as LiveRole;
       }
