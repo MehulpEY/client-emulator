@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
+import { SessionGuard } from "@/components/auth/SessionGuard";
 import { requireUser } from "@/lib/auth/current";
 
 export const dynamic = "force-dynamic";
@@ -11,6 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = await requireUser();
   return (
     <div className="bg-aurora flex h-screen overflow-hidden">
+      <SessionGuard />
       <Sidebar role={user.role} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar user={user} />

@@ -76,7 +76,10 @@ export async function getAuthUser(opts: { live?: boolean } = {}): Promise<Sessio
 }
 
 export function unauthorized() {
-  return NextResponse.json({ ok: false, error: "authentication required" }, { status: 401 });
+  // `x-auth: required` marks this as a CE authentication failure (session expired /
+  // revoked) so the client-side SessionGuard can eject to /login — WITHOUT reacting
+  // to a 401 that the mock engine returns while emulating an adapter's own auth.
+  return NextResponse.json({ ok: false, error: "authentication required" }, { status: 401, headers: { "x-auth": "required" } });
 }
 export function forbidden() {
   return NextResponse.json({ ok: false, error: "administrator role required" }, { status: 403 });
