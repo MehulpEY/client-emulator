@@ -49,6 +49,12 @@ export async function GET(req: NextRequest) {
     state,
     nonce,
     resource: AUTOX_RESOURCE, // opt-in JWT access token carrying autox:app_role
+    // Force AutoX to (re)run consent so the newly-added `offline_access` scope is
+    // actually granted and a refresh_token is minted. Without this, AutoX silently
+    // auto-approves the user's PREVIOUS consent set — which predates offline_access
+    // — and drops it, so no refresh token comes back and live revocation can't run.
+    // First-party apps are auto-approved, so this adds no visible consent screen.
+    prompt: "consent",
   });
 
   const res = NextResponse.redirect(url);
